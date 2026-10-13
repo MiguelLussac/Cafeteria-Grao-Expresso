@@ -1,0 +1,247 @@
+openapi: 3.0.3
+info:
+  title: API de Pedidos - Cafeteria Grão Expresso
+  description: |
+    API RESTful do Sistema de Pedidos da Cafeteria Grão Expresso (Squad 50).
+    Projetada conforme o Documento de Arquitetura de Solução (DAS).
+  version: 1.0.0
+servers:
+  - url: http://localhost:5000/api/v1
+    description: Servidor de Desenvolvimento Local
+  - url: https://cafeteria-grao-expresso.onrender.com/api/v1
+    description: Servidor de Produção (Render)
+
+paths:
+  /health:
+    get:
+      summary: Health Check da Aplicação
+      responses:
+        '200':
+          description: Serviço saudável
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: "healthy" }
+                  service: { type: string, example: "Cafeteria Grao Expresso API" }
+                  version: { type: string, example: "1.0.0" }
+
+  /auth/login:
+    post:
+      summary: Autenticação de Usuário (Equipe)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string, example: "atendente" }
+                password: { type: string, example: "atendente123" }
+      responses:
+        '200':
+          description: Login bem-sucedido e retorno do token JWT
+        '401':
+          description: Credenciais inválidas
+
+  /auth/me:
+    get:
+      summary: Retorna dados do usuário autenticado
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Informações do usuário logado
+
+  /products:
+    get:
+      summary: Listar produtos do cardápio
+      parameters:
+        - in: query
+          name: category
+          schema:
+            type: string
+            enum: [bebidas, doces, salgados]
+          description: Filtrar por categoria
+        - in: query
+          name: active_only
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '200':
+          description: Lista de produtos
+    post:
+      summary: Cadastrar novo produto no cardápio
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, price, category]
+              properties:
+                name: { type: string, example: "Café Expresso" }
+                description: { type: string, example: "Café encorpado 50ml" }
+                price: { type: number, format: float, example: 6.50 }
+                category: { type: string, enum: [bebidas, doces, salgados] }
+      responses:
+        '201':
+          description: Produto criado com sucesso
+
+  /products/{id}:
+    get:
+      summary: Buscar produto por ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Dados do produto
+        '404':
+          description: Produto não encontrado
+    put:
+      summary: Atualizar produto
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Produto atualizado
+    delete:
+      summary: Desativar produto
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Produto desativado
+
+  /orders:
+    get:
+      summary: Listar pedidos
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [recebido, em_preparo, pronto, entregue, cancelado]
+      responses:
+        '200':
+          description: Lista de pedidos
+    post:
+      summary: Criar um novo pedido (Totem ou Atendente)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                customer_name: { type: string, example: "Mariana Silva" }
+                table_number: { type: string, example: "Mesa 04" }
+                notes: { type: string, example: "Sem açúcar" }
+                items:
+                  type: array
+                  items:
+                    type: object
+                    required: [product_id, quantity]
+                    properties:
+                      product_id: { type: integer, example: 1 }
+                      quantity: { type: integer, example: 2 }
+      responses:
+        '201':
+          description: Pedido criado com sucesso
+
+  /orders/{id}:
+    get:
+      summary: Consultar pedido por ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Detalhes do pedido com itens e status
+
+  /orders/{id}/status:
+    patch:
+      summary: Atualizar status do pedido (Painel da Cozinha)
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [recebido, em_preparo, pronto, entregue, cancelado]
+      responses:
+        '200':
+          description: Status atualizado com sucesso
+
+  /orders/{id}/payment:
+    post:
+      summary: Registrar pagamento simulado
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [method, amount]
+              properties:
+                method:
+                  type: string
+                  enum: [dinheiro, cartao, pix]
+                amount:
+                  type: number
+                  format: float
+                  example: 20.00
+      responses:
+        '201':
+          description: Pagamento registrado com sucesso
+
+  /events/orders:
+    get:
+      summary: Stream Server-Sent Events (SSE) para atualização de pedidos
+      responses:
+        '200':
+          description: Conexão contínua de streaming SSE (text/event-stream)
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
