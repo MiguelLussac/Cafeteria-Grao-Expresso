@@ -1,0 +1,46 @@
+# Blueprint do Render: API Flask + frontend React.
+# Projeto acadêmico: a API roda em modo desenvolvimento (FLASK_ENV=development),
+# com usuários e produtos de demonstração criados automaticamente.
+services:
+  - type: web
+    name: grao-expresso-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    # gunicorn em vez de `python run.py`: o debug do Werkzeug não fica exposto
+    # na internet. Um único worker porque os eventos SSE ficam em memória.
+    startCommand: gunicorn run:app --bind 0.0.0.0:$PORT --workers 1 --worker-class gthread --threads 8 --timeout 0
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.12
+      - key: FLASK_ENV
+        value: development
+      # Segredos fixos gerados pelo Render: os tokens continuam válidos
+      # quando o serviço reinicia.
+      - key: SECRET_KEY
+        generateValue: true
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      # Banco: sem DATABASE_URL a API usa SQLite, que é apagado a cada
+      # deploy/reinício. Para usar um MySQL externo, adicione no painel do
+      # Render: DATABASE_URL=mysql+pymysql://usuario:senha@host:3306/grao_expresso
+
+  - type: web
+    name: grao-expresso-front
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    routes:
+      # Necessário para o React Router: qualquer rota abre o index.html.
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      # URL pública da API. Se o Render atribuir outro endereço ao serviço
+      # grao-expresso-api, atualize aqui e faça um novo deploy do frontend.
+      - key: VITE_API_URL
+        value: https://grao-expresso-api.onrender.com
