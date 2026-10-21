@@ -100,6 +100,43 @@ O banco de dados SQLite local (`grao_expresso.db`) será criado automaticamente 
 
 ---
 
+## 🖥️ Frontend (React + Vite)
+
+O frontend fica na pasta `frontend/`. Pré-requisito: **Node.js 20+**.
+
+Com a API rodando (`python run.py`), em outro terminal:
+```bash
+cd frontend
+npm install
+npm run dev
+```
+Acesse `http://localhost:5173`. Em desenvolvimento, as chamadas para `/api` são redirecionadas automaticamente para o Flask em `http://127.0.0.1:5000` (configurado em `frontend/vite.config.js`).
+
+### Estrutura
+```text
+frontend/src/
+├── services/api.js        # ÚNICO ponto de comunicação com a API (login, CRUD de produtos, JWT, erros)
+├── context/AuthContext.jsx # Sessão do usuário (useAuth: user, login, logout)
+├── components/
+│   ├── Layout.jsx         # Cabeçalho, navegação e rodapé com status da API
+│   ├── ProtectedRoute.jsx # Exige login para rotas administrativas
+│   └── ui.jsx             # Componentes compartilhados: Button, Alert, Field, Loading, EmptyState
+├── pages/                 # MenuPage (/), AdminPage (/admin), LoginPage (/login)
+├── utils/format.js        # formatPrice (R$), CATEGORIES, categoryLabel
+└── index.css              # Estilos globais e padrão visual
+```
+
+### Regras para quem for desenvolver telas
+- **Não use `fetch` direto nos componentes**: importe as funções de `services/api.js` (`listProducts`, `getProduct`, `createProduct`, `updateProduct`, `deleteProduct`).
+- As funções lançam `ApiError` com `message` (texto já pronto para exibir) e `status` (`0` = servidor indisponível, `400`, `401`, `403`, `404`...). Exiba a mensagem com `<Alert variant="error">`.
+- O token JWT é enviado automaticamente nas operações administrativas. Se ele expirar, a sessão é encerrada e o usuário volta para o login.
+- Exclusão de produto é **desativação** (soft-delete) e exige perfil `admin`.
+
+### Variáveis de ambiente (produção)
+Copie `frontend/.env.example` para `frontend/.env` e defina `VITE_API_URL` com a URL pública da API (ex.: o Web Service no Render).
+
+---
+
 ## 🔑 Usuários Padrão para Teste
 
 Ao iniciar em modo de desenvolvimento, o sistema cria automaticamente os usuários:

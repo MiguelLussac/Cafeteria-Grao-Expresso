@@ -1,0 +1,150 @@
+// Camada única de comunicação com a API Flask (task 10).
+// Todas as telas devem usar as funções deste arquivo em vez de chamar fetch diretamente.
+// Contrato: docs/api_contracts.md
+
+const BASE_URL = `${import.meta.env.VITE_API_URL ?? ''}/api/v1`
+
+const TOKEN_KEY = 'grao_token'
+const USER_KEY = 'grao_user'
+
+// Evento disparado quando o backend recusa o token (ausente, inválido ou expirado).
+export const AUTH_EXPIRED_EVENT = 'grao:auth-expired'
+
+export class ApiError extends Error {
+  constructor(message, status) {
+    super(message)
+    this.name = 'ApiError'
+    // 0 = sem resposta do servidor (offline, CORS, URL errada)
+    this.status = status
+  }
+}
+
+// ---------- Sessão ----------
+
+export function getToken() {
+  try {
+    return localStorage.getItem(TOKEN_KEY)
+  } catch {
+    return null
+  }
+}
+
+export function getStoredUser() {
+  try {
+    const raw = localStorage.getItem(USER_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+
+function saveSession(token, user) {
+  try {
+    localStorage.setItem(TOKEN_KEY, token)
+    localStorage.setItem(USER_KEY, JSON.stringify(user))
+  } catch {
+    // armazenamento indisponível (aba anônima, etc.): a sessão dura só até recarregar
+  }
+}
+
+export function clearSession() {
+  try {
+    localStorage.removeItem(TOKEN_KEY)
+    localStorage.removeItem(USER_KEY)
+  } catch {
+    // ignora
+  }
+}
+
+// ---------- Requisição base ----------
+
+async function request(path, { method = 'GET', body, auth = false } = {}) {
+  const headers = {}
+  if (body !== undefined) headers['Content-Type'] = 'application/json'
+
+  if (auth) {
+    const token = getToken()
+    if (token) headers.Authorization = `Bearer ${token}`
+  }
+
+  let response
+  try {
+    response = await fetch(`${BASE_URL}${path}`, {
+      method,
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    })
+  } catch {
+    throw new ApiError('Não foi possível conectar ao servidor. Tente novamente.', 0)
+  }
+
+  const data = await response.json().catch(() => null)
+
+  if (!response.ok) {
+    if (response.status === 401 && auth) {
+      clearSession()
+      window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT))
+    }
+    const message = data?.error || `Erro inesperado (HTTP ${response.status}).`
+    throw new ApiError(message, response.status)
+  }
+
+  return data
+}
+
+// ---------- Autenticação ----------
+
+export async function login(username, password) {
+  const res = await request('/auth/login', {
+    method: 'POST',
+    body: { username, password },
+  })
+  saveSession(res.data.token, res.data.user)
+  return res.data.user
+}
+
+export async function getCurrentUser() {
+  const res = await request('/auth/me', { auth: true })
+  return res.data
+}
+
+// ---------- Produtos (cardápio) ----------
+
+// filtros: { category: 'bebidas' | 'doces' | 'salgados', activeOnly: boolean }
+export async function listProducts({ category, activeOnly = true } = {}) {
+  const params = new URLSearchParams()
+  if (category) params.set('category', category)
+  if (!activeOnly) params.set('active_only', 'false')
+  const query = params.toString() ? `?${params}` : ''
+
+  const res = await request(`/products${query}`)
+  return res.data
+}
+
+export async function getProduct(id) {
+  const res = await request(`/products/${id}`)
+  return res.data
+}
+
+// product: { name, price, category, description? }
+export async function createProduct(product) {
+  const res = await request('/products', { method: 'POST', body: product, auth: true })
+  return res.data
+}
+
+// changes: qualquer subconjunto de { name, price, category, description, is_active }
+export async function updateProduct(id, changes) {
+  const res = await request(`/products/${id}`, { method: 'PUT', body: changes, auth: true })
+  return res.data
+}
+
+// O backend desativa o produto (soft-delete); exige perfil admin.
+export async function deleteProduct(id) {
+  await request(`/products/${id}`, { method: 'DELETE', auth: true })
+}
+
+// ---------- Utilitários ----------
+
+export async function checkHealth() {
+  return request('/health')
+}
