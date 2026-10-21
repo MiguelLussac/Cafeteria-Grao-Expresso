@@ -98,6 +98,39 @@ A API iniciará por padrão em `http://127.0.0.1:5000`.
 
 O banco de dados SQLite local (`grao_expresso.db`) será criado automaticamente com dados semente (usuários de teste e itens de cardápio).
 
+### Cadastrar e consultar um produto
+
+Por padrão, a aplicação usa SQLite local. Em outro terminal, faça login com um usuário padrão (por exemplo, `atendente` / `atendente123`) e copie o valor de `data.token` da resposta:
+
+```bash
+curl -X POST http://127.0.0.1:5000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"atendente","password":"atendente123"}'
+```
+
+Use esse token para cadastrar o produto:
+
+```bash
+curl -X POST http://127.0.0.1:5000/api/v1/products \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer SEU_TOKEN_JWT" \
+  -d '{"name":"Café coado","price":7.50,"category":"bebidas","description":"Café filtrado na hora"}'
+```
+
+A resposta `201 Created` inclui o produto e seu `id`. Para confirmar que foi persistido, consulte-o:
+
+```bash
+curl http://127.0.0.1:5000/api/v1/products/ID_RETORNADO
+```
+
+O caminho `/api/v1/cadastrar-produto/` também está disponível como alias compatível com o quadro da sprint. O contrato principal continua sendo `/api/v1/products`, usado pelo frontend.
+
+Para executar os testes automatizados no mesmo interpretador do ambiente virtual:
+
+```bash
+python -m pytest -v
+```
+
 ---
 
 ## 🖥️ Frontend (React + Vite)
