@@ -1,11 +1,101 @@
-from flask import Blueprint, request, jsonify
+from decimal import Decimal, InvalidOperation
+
+from flask import Blueprint, current_app, request, jsonify
+from sqlalchemy.exc import SQLAlchemyError
+
 from app.extensions import db
 from app.models.product import Product
 from app.utils.auth_decorator import role_required
 
 products_bp = Blueprint("products", __name__)
 
-VALID_CATEGORIES = ["bebidas", "doces", "salgados"]
+VALID_CATEGORIES = ("bebidas", "doces", "salgados")
+PRODUCT_FIELDS = {"name", "description", "price", "category", "is_active"}
+MAX_PRICE = Decimal("99999999.99")
+CENT = Decimal("0.01")
+
+
+def _validate_product_data(data, *, partial=False):
+    if not isinstance(data, dict):
+        return None, "O corpo da requisição deve ser um objeto JSON."
+
+    if not partial:
+        missing_fields = [
+            field for field in ("name", "price", "category")
+            if field not in data
+        ]
+        if missing_fields:
+            return None, "Campos 'name', 'price' e 'category' são obrigatórios."
+    elif not PRODUCT_FIELDS.intersection(data):
+        return None, "Informe ao menos um campo válido para atualizar."
+
+    validated = {}
+
+    if "name" in data or not partial:
+        name = data.get("name")
+        if not isinstance(name, str) or not name.strip():
+            return None, "O campo 'name' deve ser um texto não vazio."
+        name = name.strip()
+        if len(name) > 120:
+            return None, "O campo 'name' deve ter no máximo 120 caracteres."
+        validated["name"] = name
+
+    if "price" in data or not partial:
+        price = data.get("price")
+        if isinstance(price, bool) or not isinstance(price, (int, float)):
+            return None, "O preço deve ser um valor numérico positivo com até duas casas decimais."
+        try:
+            price = Decimal(str(price))
+        except (InvalidOperation, ValueError):
+            return None, "O preço deve ser um valor numérico positivo com até duas casas decimais."
+        if (
+            not price.is_finite()
+            or price <= 0
+            or price > MAX_PRICE
+            or price != price.quantize(CENT)
+        ):
+            return None, "O preço deve ser um valor numérico positivo com até duas casas decimais."
+        validated["price"] = price
+
+    if "category" in data or not partial:
+        category = data.get("category")
+        if not isinstance(category, str):
+            return None, "O campo 'category' deve ser um texto."
+        category = category.strip().lower()
+        if category not in VALID_CATEGORIES:
+            return None, f"Categoria inválida. Opções: {', '.join(VALID_CATEGORIES)}"
+        validated["category"] = category
+
+    if "description" in data:
+        description = data["description"]
+        if description is not None and not isinstance(description, str):
+            return None, "O campo 'description' deve ser um texto."
+        validated["description"] = description.strip() if description else ""
+
+    if "is_active" in data:
+        if not isinstance(data["is_active"], bool):
+            return None, "O campo 'is_active' deve ser booleano."
+        validated["is_active"] = data["is_active"]
+
+    return validated, None
+
+
+def _validation_error(message):
+    return jsonify({
+        "success": False,
+        "error": message,
+        "status_code": 400
+    }), 400
+
+
+def _database_error(message):
+    current_app.logger.exception("Falha ao salvar produto no banco de dados.")
+    db.session.rollback()
+    return jsonify({
+        "success": False,
+        "error": message,
+        "status_code": 500
+    }), 500
 
 @products_bp.route("/products", methods=["GET"])
 def list_products():
@@ -43,49 +133,26 @@ def get_product(product_id):
     }), 200
 
 @products_bp.route("/products", methods=["POST"])
+@products_bp.route("/cadastrar-produto/", methods=["POST"])
 @role_required("admin", "atendente")
 def create_product():
     """Cadastrar novo produto no cardápio."""
-    data = request.get_json(silent=True) or {}
-    name = data.get("name", "").strip()
-    price = data.get("price")
-    category = data.get("category", "").strip().lower()
-    description = data.get("description", "").strip()
-
-    if not name or price is None or not category:
-        return jsonify({
-            "success": False,
-            "error": "Campos 'name', 'price' e 'category' são obrigatórios.",
-            "status_code": 400
-        }), 400
-
-    if category not in VALID_CATEGORIES:
-        return jsonify({
-            "success": False,
-            "error": f"Categoria inválida. Opções: {', '.join(VALID_CATEGORIES)}",
-            "status_code": 400
-        }), 400
-
-    try:
-        price = float(price)
-        if price <= 0:
-            raise ValueError()
-    except (ValueError, TypeError):
-        return jsonify({
-            "success": False,
-            "error": "O preço deve ser um valor numérico positivo.",
-            "status_code": 400
-        }), 400
+    product_data, error = _validate_product_data(request.get_json(silent=True))
+    if error:
+        return _validation_error(error)
 
     product = Product(
-        name=name,
-        description=description,
-        price=price,
-        category=category,
+        name=product_data["name"],
+        description=product_data.get("description", ""),
+        price=product_data["price"],
+        category=product_data["category"],
         is_active=True
     )
-    db.session.add(product)
-    db.session.commit()
+    try:
+        db.session.add(product)
+        db.session.commit()
+    except SQLAlchemyError:
+        return _database_error("Não foi possível cadastrar o produto.")
 
     return jsonify({
         "success": True,
@@ -94,6 +161,7 @@ def create_product():
     }), 201
 
 @products_bp.route("/products/<int:product_id>", methods=["PUT"])
+@products_bp.route("/alterar-produto/<int:product_id>", methods=["PUT"])
 @role_required("admin", "atendente")
 def update_product(product_id):
     """Atualizar dados de um produto existente."""
@@ -105,26 +173,20 @@ def update_product(product_id):
             "status_code": 404
         }), 404
 
-    data = request.get_json(silent=True) or {}
-    if "name" in data:
-        product.name = data["name"].strip()
-    if "description" in data:
-        product.description = data["description"].strip()
-    if "category" in data:
-        cat = data["category"].strip().lower()
-        if cat in VALID_CATEGORIES:
-            product.category = cat
-    if "price" in data:
-        try:
-            val = float(data["price"])
-            if val > 0:
-                product.price = val
-        except (ValueError, TypeError):
-            pass
-    if "is_active" in data:
-        product.is_active = bool(data["is_active"])
+    product_data, error = _validate_product_data(
+        request.get_json(silent=True),
+        partial=True
+    )
+    if error:
+        return _validation_error(error)
 
-    db.session.commit()
+    for field, value in product_data.items():
+        setattr(product, field, value)
+
+    try:
+        db.session.commit()
+    except SQLAlchemyError:
+        return _database_error("Não foi possível atualizar o produto.")
     return jsonify({
         "success": True,
         "message": "Produto atualizado com sucesso.",
@@ -132,6 +194,7 @@ def update_product(product_id):
     }), 200
 
 @products_bp.route("/products/<int:product_id>", methods=["DELETE"])
+@products_bp.route("/remover-produto/<int:product_id>", methods=["DELETE"])
 @role_required("admin")
 def delete_product(product_id):
     """Desativa um produto do cardápio (soft-delete)."""
@@ -144,7 +207,10 @@ def delete_product(product_id):
         }), 404
 
     product.is_active = False
-    db.session.commit()
+    try:
+        db.session.commit()
+    except SQLAlchemyError:
+        return _database_error("Não foi possível desativar o produto.")
 
     return jsonify({
         "success": True,

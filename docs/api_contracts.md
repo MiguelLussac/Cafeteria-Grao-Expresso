@@ -129,7 +129,10 @@ Todas as respostas de erro retornam um JSON padronizado:
 
 ### 3.3 Criar Novo Produto
 - **Endpoint:** `POST /api/v1/products`
+- **Alias compatível com o quadro da sprint:** `POST /api/v1/cadastrar-produto/`
 - **Acesso:** Requer JWT com role `admin` ou `atendente`
+- **Campos obrigatórios:** `name` (texto não vazio, até 120 caracteres), `price` (número positivo, até duas casas decimais) e `category` (`bebidas`, `doces` ou `salgados`).
+- **Campo opcional:** `description` (texto).
 - **Request Body:**
 ```json
 {
@@ -139,10 +142,13 @@ Todas as respostas de erro retornam um JSON padronizado:
   "category": "bebidas"
 }
 ```
+- Valores ausentes, campos com formato inválido, categoria não permitida e preços zero/negativos são rejeitados com `400 Bad Request`.
+- Falhas ao persistir no banco retornam `500 Internal Server Error` sem expor detalhes internos.
 - **Response `201 Created`:**
 ```json
 {
   "success": true,
+  "message": "Produto criado com sucesso.",
   "data": {
     "id": 3,
     "name": "Capuccino Italiano",
@@ -153,10 +159,12 @@ Todas as respostas de erro retornam um JSON padronizado:
   }
 }
 ```
+O registro retornado pode ser consultado por `GET /api/v1/products/{id}`.
 
 ### 3.4 Atualizar Produto
 - **Endpoint:** `PUT /api/v1/products/{id}`
 - **Acesso:** Requer JWT com role `admin` ou `atendente`
+- Os mesmos validadores de nome, preço e categoria do cadastro também são aplicados na edição.
 - **Request Body:**
 ```json
 {
