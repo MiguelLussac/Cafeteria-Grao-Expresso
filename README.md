@@ -137,6 +137,29 @@ Copie `frontend/.env.example` para `frontend/.env` e defina `VITE_API_URL` com a
 
 ---
 
+## ☁️ Deploy no Render
+
+O arquivo `render.yaml` (Blueprint) cria os dois serviços de uma vez:
+
+| Serviço | Tipo | Endereço esperado |
+|---|---|---|
+| `grao-expresso-api` | Web Service (Python + gunicorn) | `https://grao-expresso-api.onrender.com` |
+| `grao-expresso-front` | Static Site (React) | `https://grao-expresso-front.onrender.com` |
+
+**Passo a passo**
+1. No Render, clique em **New → Blueprint** e selecione este repositório (branch `main`).
+2. Confirme a criação dos serviços. `SECRET_KEY` e `JWT_SECRET_KEY` são geradas automaticamente.
+3. Ao terminar, confira o endereço da API em `/api/v1/health`. Se o Render tiver atribuído outro endereço, atualize `VITE_API_URL` no serviço `grao-expresso-front` e faça **Manual Deploy** do frontend.
+4. Acesse o frontend e entre com um dos usuários padrão abaixo.
+
+**Como a API roda no Render (projeto acadêmico)**
+- `FLASK_ENV=development`: os usuários e produtos de demonstração são criados automaticamente.
+- O servidor é o **gunicorn**, não `python run.py`, para não expor o debugger do Werkzeug na internet. Usa um único worker porque os eventos SSE ficam em memória.
+- Sem `DATABASE_URL`, o banco é **SQLite e é apagado a cada deploy/reinício** (os dados de demonstração são recriados). Para manter os dados, adicione no painel `DATABASE_URL=mysql+pymysql://usuario:senha@host:3306/grao_expresso` apontando para um MySQL externo.
+- No plano gratuito, o serviço hiberna após ~15 min sem acesso; a primeira requisição depois disso pode levar cerca de 1 minuto.
+
+---
+
 ## 🔑 Usuários Padrão para Teste
 
 Ao iniciar em modo de desenvolvimento, o sistema cria automaticamente os usuários:
