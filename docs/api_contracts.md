@@ -190,9 +190,19 @@ O registro retornado pode ser consultado por `GET /api/v1/products/{id}`.
 
 ## 4. Pedidos (`/api/v1/orders`)
 
+Os formatos abaixo correspondem às rotas e aos modelos Flask atuais. Guia de uso no React,
+diferenças encontradas e pendências de validação da equipe: [Integração Sprint 2](frontend_orders.md).
+As datas de pedidos/pagamentos são strings ISO 8601 em UTC **sem sufixo de fuso**
+(ex.: `2026-10-13T15:40:00`), conforme `datetime.utcnow().isoformat()` do backend.
+
 ### 4.1 Criar Novo Pedido
 - **Endpoint:** `POST /api/v1/orders`
 - **Acesso:** Público (Totem de autoatendimento) ou Atendente
+- **Campos:** `items` é uma lista não vazia com `product_id` de produto ativo e
+  `quantity` inteiro positivo (padrão `1` quando omitido). `customer_name`,
+  `table_number` e `notes` são textos opcionais; omitidos/vazios resultam em
+  `"Balcão"`, `"Retirada"` e `""`. Preços e total são calculados pelo backend.
+- **Erros:** `400` para lista vazia, quantidade não positiva ou produto inexistente/inativo.
 - **Request Body:**
 ```json
 {
@@ -222,8 +232,9 @@ O registro retornado pode ser consultado por `GET /api/v1/products/{id}`.
     "notes": "Café sem açúcar",
     "status": "recebido",
     "total_amount": 20.00,
-    "created_at": "2026-10-13T15:40:00Z",
-    "updated_at": "2026-10-13T15:40:00Z",
+    "created_at": "2026-10-13T15:40:00",
+    "updated_at": "2026-10-13T15:40:00",
+    "items_count": 2,
     "items": [
       {
         "id": 1,
@@ -257,14 +268,17 @@ O registro retornado pode ser consultado por `GET /api/v1/products/{id}`.
 ```json
 {
   "success": true,
+  "count": 1,
   "data": [
     {
       "id": 101,
       "customer_name": "Mariana Silva",
       "table_number": "Mesa 04",
+      "notes": "Café sem açúcar",
       "status": "recebido",
       "total_amount": 20.00,
-      "created_at": "2026-10-13T15:40:00Z",
+      "created_at": "2026-10-13T15:40:00",
+      "updated_at": "2026-10-13T15:40:00",
       "items_count": 2
     }
   ]
@@ -275,6 +289,8 @@ O registro retornado pode ser consultado por `GET /api/v1/products/{id}`.
 - **Endpoint:** `GET /api/v1/orders/{id}`
 - **Acesso:** Público (usado pelo cliente para acompanhar status)
 - **Response `200 OK`:** Retorna o pedido completo com lista de itens e pagamento.
+- **Erro:** `404` para pedido inexistente. `items_count` conta linhas de itens,
+  não a soma das quantidades. A listagem não inclui `items` nem `payment`.
 
 ### 4.4 Atualizar Status do Pedido
 - **Endpoint:** `PATCH /api/v1/orders/{id}/status`
@@ -294,11 +310,15 @@ O registro retornado pode ser consultado por `GET /api/v1/products/{id}`.
   "data": {
     "id": 101,
     "status": "em_preparo",
-    "updated_at": "2026-10-13T15:45:00Z"
+    "updated_at": "2026-10-13T15:45:00"
   }
 }
 ```
 *(Nota: Ao mudar para `pronto`, um evento SSE é disparado automaticamente para avisar o cliente e o totem).*
+O backend aceita qualquer um dos cinco status, sem impor sequência de transições.
+Erros: `400` status inválido; `401` JWT ausente/inválido/expirado;
+`403` perfil sem permissão; `404` pedido inexistente. O texto de `message` pode
+variar; use os campos de `data`, não compare mensagens de sucesso.
 
 ---
 
@@ -315,6 +335,10 @@ O registro retornado pode ser consultado por `GET /api/v1/products/{id}`.
 }
 ```
 *Valores aceitos para `method`:* `dinheiro`, `cartao`, `pix`.
+`method` é obrigatório; `amount` é opcional. Omitido ou `null`, usa o total do
+pedido. Nas telas, prefira omiti-lo. O backend atual não exige que um valor
+explícito seja igual ao total. Erros: `400` método ausente/inválido, valor não
+conversível em número ou pagamento já registrado; `404` pedido inexistente.
 - **Response `201 Created`:**
 ```json
 {
@@ -325,12 +349,20 @@ O registro retornado pode ser consultado por `GET /api/v1/products/{id}`.
     "method": "pix",
     "amount": 20.00,
     "status": "pago",
-    "paid_at": "2026-10-13T15:41:00Z"
+    "paid_at": "2026-10-13T15:41:00"
   }
 }
 ```
 
 ---
+
+### 5.2 Consultar Pagamento
+- **Endpoint:** `GET /api/v1/orders/{id}/payment`
+- **Acesso:** Público.
+- **Response `200 OK`:** Envelope `{ "success": true, "data": ... }` com o
+  mesmo objeto de pagamento da seção 5.1.
+- **Erro:** `404` para pedido inexistente ou sem pagamento. No React,
+  `getOrder(id)` já inclui `payment` (objeto ou `null`).
 
 ## 6. Notificações em Tempo Real via SSE (`/api/v1/events`)
 
@@ -342,7 +374,7 @@ O registro retornado pode ser consultado por `GET /api/v1/products/{id}`.
 - **Formato dos Eventos Emitidos:**
 ```text
 event: order_status_updated
-data: {"order_id": 101, "customer_name": "Mariana Silva", "table_number": "Mesa 04", "status": "pronto", "timestamp": "2026-10-13T15:50:00Z"}
+data: {"order_id": 101, "customer_name": "Mariana Silva", "table_number": "Mesa 04", "status": "pronto", "updated_at": "2026-10-13T15:50:00"}
 ```
 
 ---

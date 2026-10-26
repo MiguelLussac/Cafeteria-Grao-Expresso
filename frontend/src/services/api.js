@@ -2,7 +2,7 @@
 // Todas as telas devem usar as funções deste arquivo em vez de chamar fetch diretamente.
 // Contrato: docs/api_contracts.md
 
-const BASE_URL = `${import.meta.env.VITE_API_URL ?? ''}/api/v1`
+const BASE_URL = `${import.meta.env?.VITE_API_URL ?? ''}/api/v1`
 
 const TOKEN_KEY = 'grao_token'
 const USER_KEY = 'grao_user'
@@ -141,6 +141,44 @@ export async function updateProduct(id, changes) {
 // O backend desativa o produto (soft-delete); exige perfil admin.
 export async function deleteProduct(id) {
   await request(`/products/${id}`, { method: 'DELETE', auth: true })
+}
+
+// ---------- Pedidos e pagamento simulado ----------
+
+// order: { items: [{ product_id, quantity }], customer_name?, table_number?, notes? }
+export async function createOrder(order) {
+  const res = await request('/orders', { method: 'POST', body: order })
+  return res.data
+}
+
+// Retorna o array de res.data, assim como listProducts (sem o envelope/count).
+export async function listOrders({ status, limit } = {}) {
+  const params = new URLSearchParams()
+  if (status) params.set('status', status)
+  if (limit !== undefined) params.set('limit', limit)
+  const query = params.toString() ? `?${params}` : ''
+  const res = await request(`/orders${query}`)
+  return res.data
+}
+
+export async function getOrder(id) {
+  const res = await request(`/orders/${id}`)
+  return res.data
+}
+
+// payment: { method: 'dinheiro' | 'cartao' | 'pix', amount? }
+// Sem amount, o Flask usa o total do pedido. Não processa dinheiro real.
+export async function registerSimulatedPayment(id, payment) {
+  const res = await request(`/orders/${id}/payment`, { method: 'POST', body: payment })
+  return res.data
+}
+
+// Exige login como barista, atendente ou admin; retorna { id, status, updated_at }.
+export async function updateOrderStatus(id, status) {
+  const res = await request(`/orders/${id}/status`, {
+    method: 'PATCH', body: { status }, auth: true,
+  })
+  return res.data
 }
 
 // ---------- Utilitários ----------

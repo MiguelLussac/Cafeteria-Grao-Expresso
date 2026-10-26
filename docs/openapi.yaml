@@ -178,6 +178,9 @@ paths:
           schema:
             type: string
             enum: [recebido, em_preparo, pronto, entregue, cancelado]
+        - in: query
+          name: limit
+          schema: { type: integer, default: 50 }
       responses:
         '200':
           description: Lista de pedidos
@@ -198,10 +201,10 @@ paths:
                   type: array
                   items:
                     type: object
-                    required: [product_id, quantity]
+                    required: [product_id]
                     properties:
                       product_id: { type: integer, example: 1 }
-                      quantity: { type: integer, example: 2 }
+                      quantity: { type: integer, minimum: 1, default: 1, example: 2 }
       responses:
         '201':
           description: Pedido criado com sucesso
@@ -257,7 +260,7 @@ paths:
           application/json:
             schema:
               type: object
-              required: [method, amount]
+              required: [method]
               properties:
                 method:
                   type: string
@@ -265,10 +268,25 @@ paths:
                 amount:
                   type: number
                   format: float
+                  nullable: true
+                  description: Omitido ou null utiliza o total do pedido.
                   example: 20.00
       responses:
         '201':
           description: Pagamento registrado com sucesso
+
+    get:
+      summary: Consultar pagamento simulado do pedido
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Envelope success/data com payment_id, order_id, method, amount, status e paid_at.
+        '404':
+          description: Pedido inexistente ou sem pagamento.
 
   /events/orders:
     get:

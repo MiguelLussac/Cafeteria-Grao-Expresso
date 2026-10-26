@@ -10,3 +10,12 @@ Currently, two official plugins are available:
 ## Expanding the ESLint configuration
 
 If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+
+## Pedidos e pagamentos (Sprint 2)
+
+Use `createOrder`, `listOrders`, `getOrder`, `registerSimulatedPayment` e
+`updateOrderStatus` de `src/services/api.js`.
+Veja assinaturas, exemplos, autenticação e erros em
+[docs/frontend_orders.md](../docs/frontend_orders.md).
+Execute `npm test` para os testes do serviço e `python -m pytest -q` na raiz
+para a integração com Flask (Node.js 20+ necessário).
