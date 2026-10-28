@@ -5,8 +5,8 @@
 `frontend/src/pages/PaymentPage.jsx`. Pública, sem login.
 
 - Recebe o pedido pelo ID da rota e consulta `getOrder` (total e itens vêm do
-  servidor). Enquanto os cards 6 e 7 não existem, crie o pedido via API e abra a
-  URL; ao final do card 7 basta navegar para `/pedido/${order.id}/pagamento`.
+  servidor). Os cards 6 e 7 estão integrados: a confirmação do resumo navega
+  para `/pedido/${order.id}/pagamento`, usando esta tela funcional.
 - Formas: Dinheiro, Cartão e Pix. Envia somente `{ method }`; o Flask usa o total.
 - Botão desabilitado e trava síncrona (`useRef`) impedem envio duplicado.
 - A confirmação só aparece com resposta 201 **ou** se, após um erro, `getOrder`
@@ -65,3 +65,19 @@ Observação: em desenvolvimento, com as chaves de exemplo do `.env`, o Flask ge
 segredos novos a cada reinício, e os tokens antigos passam a receber 401 (o
 painel volta ao login). Para não perder a sessão ao reiniciar, defina
 `JWT_SECRET_KEY` no `.env` local.
+
+## Integração com os cards 6 e 7 (28/10/2026)
+
+Conflitos com a `main` em `b40e0f5` resolvidos nas rotas e no CSS. As telas de
+pagamento e cozinha deste PR foram preservadas; a seleção, o resumo e seu
+`OrderProvider` foram integrados. A tela provisória de pagamento foi removida.
+Os estilos das duas entregas foram mantidos com seus blocos de mídia separados.
+
+Validação após a resolução:
+
+- 34 testes JavaScript aprovados; lint e build aprovados.
+- Teste de integração HTTP real JS/Flask aprovado.
+- Navegador com API e banco em memória: seleção → resumo com observação →
+  pagamento Pix → login do barista → pedido pago na cozinha → em preparo → pronto.
+- Sem alterações na implementação das telas `PaymentPage`, `KitchenPage` ou
+  no hook `useKitchenQueue` em relação à versão original deste PR.

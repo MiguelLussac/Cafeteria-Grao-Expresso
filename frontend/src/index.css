@@ -1358,6 +1358,94 @@ textarea {
   }
 }
 
+/* ---------- Resumo do pedido ---------- */
+
+.selection { margin-bottom: 32px; }
+.selection-heading, .selection-actions, .selection-items li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.selection-heading span { color: var(--color-muted); }
+.selection-items { list-style: none; padding: 0; margin: 16px 0; }
+.selection-items li { padding: 12px 0; border-bottom: 1px solid var(--color-border); }
+.selection-items p { margin: 4px 0; color: var(--color-muted); }
+.selection-actions { margin-top: 16px; }
+.quantity-controls { display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; }
+.quantity-field { display: flex; flex-direction: column; gap: 4px; font-size: .8rem; }
+.quantity-field input {
+  width: 88px;
+  min-height: 46px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius);
+  padding: 8px;
+  font-size: 1rem;
+  background: var(--color-surface);
+}
+
+.order-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+}
+
+.order-items li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding: 16px;
+  overflow-wrap: anywhere;
+}
+
+.order-items li + li {
+  border-top: 1px solid var(--color-border);
+}
+
+.order-items p {
+  margin: 4px 0 0;
+  color: var(--color-muted);
+}
+
+.order-items li > strong {
+  white-space: nowrap;
+}
+
+.order-total {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 1.2rem;
+}
+
+.order-fields {
+  display: grid;
+  gap: 20px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 20px;
+  min-width: 0;
+}
+
+.order-fields legend {
+  font-weight: 600;
+  padding: 0 8px;
+}
+
+.order-payment {
+  margin-top: 24px;
+}
+
+@media (max-width: 520px) {
+  .form-actions { flex-wrap: wrap; }
+  .form-actions > .btn { flex: 1; white-space: normal; padding: 12px; }
+}
+
 /* ---------- Responsivo ---------- */
 
 @media (max-width: 1024px) {

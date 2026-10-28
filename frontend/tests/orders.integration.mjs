@@ -1,6 +1,7 @@
 // Executado pelo pytest contra um servidor Flask real e banco de teste isolado.
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
+import { createOrderSubmitter } from '../src/utils/order.js'
 import {
   createOrder, listOrders, getOrder, registerSimulatedPayment,
   updateOrderStatus, login, listProducts, AUTH_EXPIRED_EVENT,
@@ -19,10 +20,14 @@ test('React api.js -> HTTP -> Flask: pedido, pagamento, JWT e erros', async () =
   globalThis.window = { dispatchEvent: event => events.push(event.type) }
   try {
     const [product] = await listProducts()
-    const order = await createOrder({
-      customer_name: 'Teste Sprint 2', table_number: 'Mesa 04', notes: 'Sem acucar',
-      items: [{ product_id: product.id, quantity: 2 }],
-    })
+    const confirm = createOrderSubmitter(createOrder)
+    const selected = [{ ...product, price: 0.01, quantity: 2 }]
+    const details = { customer_name: 'Teste Sprint 2', table_number: 'Mesa 04', notes: 'Sem acucar' }
+    const [order, duplicate] = await Promise.all([
+      confirm(selected, details), confirm(selected, details),
+    ])
+    assert.equal(duplicate.id, order.id)
+    assert.equal((await listOrders()).length, 1)
     assert.equal(order.status, 'recebido')
     assert.equal(order.total_amount, product.price * 2)
     assert.equal(order.items_count, 1)
@@ -66,6 +71,17 @@ test('React api.js -> HTTP -> Flask: pedido, pagamento, JWT e erros', async () =
     await assert.rejects(registerSimulatedPayment(second.id, { method: 'invalido' }), { status: 400 })
     const explicit = await registerSimulatedPayment(second.id, { method: 'dinheiro', amount: second.total_amount })
     assert.equal(explicit.amount, second.total_amount)
+    const products = await listProducts()
+    const multi = createOrderSubmitter(createOrder)
+    const multiple = await multi([
+      { ...products[0], quantity: 3 }, { ...products[1], quantity: 2 },
+    ], details)
+    assert.equal(multiple.items.length, 2)
+    assert.equal(multiple.total_amount, products[0].price * 3 + products[1].price * 2)
+    assert.equal(multiple.payment, null)
+    const invalid = createOrderSubmitter(createOrder)
+    await assert.rejects(invalid([{ id: 999999, quantity: 1 }], details), { status: 400 })
+    assert.equal((await listOrders()).length, 3)
   } finally {
     globalThis.fetch = nativeFetch
     delete globalThis.localStorage
