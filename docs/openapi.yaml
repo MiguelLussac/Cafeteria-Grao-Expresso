@@ -209,6 +209,33 @@ paths:
         '201':
           description: Pedido criado com sucesso
 
+  /orders/kitchen:
+    get:
+      summary: Fila paga da cozinha com itens completos
+      description: |
+        Apenas pagamentos pagos e pedidos recebido/em_preparo/pronto.
+        Ordena por paid_at crescente e id. Sem truncamento.
+        Retorna success, count e data com os mesmos pedidos completos de GET /orders/{id}.
+        id é o número do pedido; notes contém observações; items contém product_name e quantity.
+        Consultar em toda conexão/reconexão SSE para recuperar o estado.
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [recebido, em_preparo, pronto]
+      responses:
+        '200':
+          description: Fila completa de pedidos liberados
+        '400':
+          description: Filtro inválido
+        '401':
+          description: JWT ausente, inválido ou expirado
+        '403':
+          description: Perfil diferente de barista, atendente ou admin
+
   /orders/{id}:
     get:
       summary: Consultar pedido por ID
@@ -224,6 +251,10 @@ paths:
   /orders/{id}/status:
     patch:
       summary: Atualizar status do pedido (Painel da Cozinha)
+      description: |
+        recebido -> em_preparo -> pronto -> entregue. Cancelamento de recebido ou em_preparo.
+        Avanços exigem pagamento pago. Terminais não podem ser reabertos.
+        Repetição, salto, retrocesso, conflito concorrente ou avanço sem pagamento retorna 409.
       security:
         - BearerAuth: []
       parameters:
@@ -245,6 +276,10 @@ paths:
       responses:
         '200':
           description: Status atualizado com sucesso
+        '400':
+          description: Status ou corpo inválido
+        '409':
+          description: Transição não permitida ou pedido ainda não pago
 
   /orders/{id}/payment:
     post:
@@ -269,7 +304,7 @@ paths:
                   type: number
                   format: float
                   nullable: true
-                  description: Omitido ou null utiliza o total do pedido.
+                  description: Omitido ou null utiliza o total; explícito deve ser finito, positivo e igual ao total.
                   example: 20.00
       responses:
         '201':
@@ -291,6 +326,12 @@ paths:
   /events/orders:
     get:
       summary: Stream Server-Sent Events (SSE) para atualização de pedidos
+      description: |
+        Público, preservando o contrato existente. new_order somente após pagamento persistido
+        (order_id e pedido completo); order_status_updated e order_ready após mudanças persistidas.
+        connected contém resync_required=true e state_url=/api/v1/orders/kitchen (consulta com JWT).
+        Reconectar após 3000ms e recuperar estado pela API em toda conexão; não há replay de Last-Event-ID.
+        Heartbeat ocioso a cada 15s. Fila saturada encerra o stream para reconexão e ressincronização.
       responses:
         '200':
           description: Conexão contínua de streaming SSE (text/event-stream)

@@ -9,6 +9,14 @@ class OrderStatus:
     CANCELADO = "cancelado"
 
     ALL = [RECEBIDO, EM_PREPARO, PRONTO, ENTREGUE, CANCELADO]
+    KITCHEN = [RECEBIDO, EM_PREPARO, PRONTO]
+    TRANSITIONS = {
+        RECEBIDO: {EM_PREPARO, CANCELADO},
+        EM_PREPARO: {PRONTO, CANCELADO},
+        PRONTO: {ENTREGUE},
+        ENTREGUE: set(),
+        CANCELADO: set(),
+    }
 
 class Order(db.Model):
     """Modelo de pedido da cafeteria."""

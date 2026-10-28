@@ -29,10 +29,10 @@ try {
   })
   await registerSimulatedPayment(order.id, { method: 'pix' })
   const details = await getOrder(order.id)
-  const queue = await listOrders({ status: 'recebido', limit: 50 })
+  const summaries = await listOrders({ status: 'recebido', limit: 50 })
   // Na cozinha, após login como barista, atendente ou admin:
   const updated = await updateOrderStatus(order.id, 'em_preparo')
-  // Use details, queue e updated para atualizar o estado da tela.
+  // Use details, summaries e updated para atualizar o estado da tela.
 } catch (error) {
   if (error instanceof ApiError) {
     // Exiba error.message no Alert da tela; error.status identifica o HTTP.
@@ -71,9 +71,11 @@ testes HTTP. **A confirmação dos integrantes do backend permanece pendente**:
 não houve contato com a equipe nesta execução. Para fechar o alinhamento humano,
 compartilhe este guia e confirme os campos das telas de pedido, fila e pagamento.
 
-Limitações observadas no backend para revisão da equipe: corpos com tipos
-inesperados podem causar `500` em vez de `400`; `limit` não tem faixa validada;
-pagamentos explícitos não são comparados ao total; status não exige sequência.
+Limitações observadas no backend para revisão da equipe: corpos de criação com
+tipos inesperados podem causar `500` em vez de `400`; `limit` da listagem geral
+não tem faixa validada. Os cards 4/5 passaram a exigir pagamento igual ao total
+e sequência de status. Para a cozinha, integrar `GET /orders/kitchen` com JWT,
+em vez da listagem geral; protocolo SSE em [kitchen_sse.md](kitchen_sse.md).
 O serviço preserva esses erros como `ApiError`; não adiciona regras divergentes
 no frontend. Uma mudança nessas regras exige atualizar backend, contrato e testes.
 

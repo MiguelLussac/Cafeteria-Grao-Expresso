@@ -1,7 +1,10 @@
 from flask import Blueprint, request, jsonify
+from decimal import Decimal, InvalidOperation
+from sqlalchemy.exc import SQLAlchemyError
 from app.extensions import db
-from app.models.order import Order
+from app.models.order import Order, OrderStatus
 from app.models.payment import Payment, PaymentMethod, PaymentStatus
+from app.services.sse_service import sse_broker
 
 payments_bp = Blueprint("payments", __name__)
 
@@ -23,8 +26,16 @@ def register_simulated_payment(order_id):
             "status_code": 400
         }), 400
 
+    if order.status != OrderStatus.RECEBIDO:
+        return jsonify({"success": False, "error": "Pedido não está aguardando pagamento.",
+                        "status_code": 409}), 409
+
     data = request.get_json(silent=True) or {}
-    method = data.get("method", "").strip().lower()
+    if not isinstance(data, dict):
+        return jsonify({"success": False, "error": "Corpo deve ser um objeto JSON.",
+                        "status_code": 400}), 400
+    value = data.get("method")
+    method = value.strip().lower() if isinstance(value, str) else ""
     amount = data.get("amount")
 
     if not method:
@@ -42,16 +53,21 @@ def register_simulated_payment(order_id):
         }), 400
 
     if amount is None:
-        amount = float(order.total_amount)
+        amount = order.total_amount
     else:
         try:
-            amount = float(amount)
-        except (ValueError, TypeError):
+            amount = Decimal(str(amount))
+        except (InvalidOperation, ValueError, TypeError):
             return jsonify({
                 "success": False,
                 "error": "Valor de pagamento inválido.",
                 "status_code": 400
             }), 400
+
+    if not amount.is_finite() or amount <= 0 or amount != order.total_amount:
+        return jsonify({"success": False,
+                        "error": "O pagamento deve corresponder ao total positivo do pedido.",
+                        "status_code": 400}), 400
 
     payment = Payment(
         order_id=order.id,
@@ -60,7 +76,15 @@ def register_simulated_payment(order_id):
         status=PaymentStatus.PAGO
     )
     db.session.add(payment)
-    db.session.commit()
+    try:
+        db.session.commit()
+    except SQLAlchemyError:
+        db.session.rollback()
+        return jsonify({"success": False, "error": "Falha ao registrar pagamento.",
+                        "status_code": 500}), 500
+
+    # Mantém o nome de evento existente, agora somente após liberação persistida.
+    sse_broker.publish("new_order", {"order_id": order.id, **order.to_dict()})
 
     return jsonify({
         "success": True,

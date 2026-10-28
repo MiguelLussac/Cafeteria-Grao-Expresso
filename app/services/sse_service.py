@@ -32,6 +32,13 @@ class SSEBroker:
                 try:
                     q.put_nowait(message)
                 except queue.Full:
+                    # Acorda o gerador e força recuperação via API na reconexão.
+                    while True:
+                        try:
+                            q.get_nowait()
+                        except queue.Empty:
+                            break
+                    q.put_nowait(None)
                     to_remove.append(q)
             for q in to_remove:
                 if q in self._listeners:
