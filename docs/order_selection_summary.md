@@ -32,11 +32,11 @@ pedido ou iniciar explicitamente outro, reiniciando a seleção.
 
 ## Integração com Card 8
 
-`OrderPaymentPage.jsx` é o ponto de entrada para a próxima etapa. Exibe ID,
-total e situação de pagamento consultados pelo serviço existente `getOrder`.
-O formulário/ação de pagamento simulado continua sendo responsabilidade do
-Card 8. A página informa que essa ação ainda não está disponível; não registra
-pagamento automaticamente e não libera pedidos para a cozinha.
+Após a integração com o PR dos cards 8/9/10, `PaymentPage.jsx` é o ponto de
+entrada para a próxima etapa, em `/pedido/:id/pagamento`. A tela provisória
+`OrderPaymentPage.jsx` foi substituída pela implementação de pagamento do Card 8.
+O resumo encaminha o ID retornado pela criação; o pagamento consulta itens e
+total definitivo pela API. Registrar o pedido não confirma seu pagamento.
 
 ## Erros e limites
 

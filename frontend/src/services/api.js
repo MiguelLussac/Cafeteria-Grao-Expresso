@@ -181,6 +181,42 @@ export async function updateOrderStatus(id, status) {
   return res.data
 }
 
+// ---------- Cozinha e eventos em tempo real ----------
+
+// Fila completa da cozinha (pedidos pagos em recebido, em_preparo ou pronto),
+// do pagamento mais antigo para o mais recente. Exige barista, atendente ou admin.
+export async function listKitchenOrders({ status } = {}) {
+  const query = status ? `?${new URLSearchParams({ status })}` : ''
+  const res = await request(`/orders/kitchen${query}`, { auth: true })
+  return res.data
+}
+
+export const ORDER_EVENT_TYPES = ['new_order', 'order_status_updated', 'order_ready']
+
+// Abre o stream SSE de pedidos (docs/kitchen_sse.md) e retorna a função que o fecha.
+// onConnected: a cada (re)conexão — o estado deve ser recuperado pela API.
+// onEvent(type, data): eventos de pedido. onError(closed): perda de conexão;
+// closed=true quando o navegador desistiu de reconectar sozinho.
+export function subscribeOrderEvents({ onConnected, onEvent, onError } = {}) {
+  const source = new EventSource(`${BASE_URL}/events/orders`)
+
+  source.addEventListener('connected', () => onConnected?.())
+  for (const type of ORDER_EVENT_TYPES) {
+    source.addEventListener(type, (event) => {
+      let data = null
+      try {
+        data = JSON.parse(event.data)
+      } catch {
+        // evento sem JSON válido: trata apenas como aviso de mudança
+      }
+      onEvent?.(type, data)
+    })
+  }
+  source.onerror = () => onError?.(source.readyState === EventSource.CLOSED)
+
+  return () => source.close()
+}
+
 // ---------- Utilitários ----------
 
 export async function checkHealth() {

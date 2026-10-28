@@ -76,6 +76,7 @@ export default function Layout() {
           {!isLogin && (
             <nav className="nav" aria-label="Principal">
               <NavLink to="/" end>Cardápio</NavLink>
+              {isAuthenticated && <NavLink to="/cozinha">Cozinha</NavLink>}
               {isAuthenticated && <NavLink to="/admin">Administração</NavLink>}
             </nav>
           )}
