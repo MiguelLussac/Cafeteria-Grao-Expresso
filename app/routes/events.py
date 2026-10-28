@@ -1,4 +1,5 @@
 from flask import Blueprint, Response, stream_with_context
+from queue import Empty
 from app.services.sse_service import sse_broker
 
 events_bp = Blueprint("events", __name__)
@@ -11,11 +12,22 @@ def stream_order_events():
         q = sse_broker.subscribe()
         try:
             # Envia mensagem inicial de confirmação de conexão
-            yield "event: connected\ndata: {\"message\": \"Conexão SSE estabelecida com sucesso\"}\n\n"
+            # Inscreve antes de solicitar o snapshot para não perder mudanças
+            # ocorridas durante a recuperação. O consumidor aplica por order_id.
+            yield ('retry: 3000\nevent: connected\n'
+                   'data: {"message": "Conexão SSE estabelecida com sucesso", '
+                   '"resync_required": true, "state_url": "/api/v1/orders/kitchen"}\n\n')
             while True:
-                msg = q.get()
+                try:
+                    msg = q.get(timeout=15)
+                except Empty:
+                    yield ": heartbeat\n\n"
+                    continue
+                if msg is None:
+                    # Fila saturada: encerra para reconectar e recuperar via API.
+                    return
                 yield msg
-        except GeneratorExit:
+        finally:
             sse_broker.unsubscribe(q)
 
     return Response(

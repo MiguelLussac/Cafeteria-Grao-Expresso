@@ -315,10 +315,26 @@ As datas de pedidos/pagamentos são strings ISO 8601 em UTC **sem sufixo de fuso
 }
 ```
 *(Nota: Ao mudar para `pronto`, um evento SSE é disparado automaticamente para avisar o cliente e o totem).*
-O backend aceita qualquer um dos cinco status, sem impor sequência de transições.
+Transições permitidas: `recebido → em_preparo → pronto → entregue`;
+cancelamento a partir de `recebido` ou `em_preparo`. `entregue` e `cancelado`
+são terminais. Repetições, saltos e retrocessos retornam `409`.
+Avanços exigem pagamento `pago`; cancelar um pedido não pago é permitido.
 Erros: `400` status inválido; `401` JWT ausente/inválido/expirado;
 `403` perfil sem permissão; `404` pedido inexistente. O texto de `message` pode
 variar; use os campos de `data`, não compare mensagens de sucesso.
+
+### 4.5 Fila da cozinha e recuperação de estado
+- **Endpoint:** `GET /api/v1/orders/kitchen`
+- **Acesso:** JWT de `barista`, `atendente` ou `admin`.
+- Retorna `{success, count, data}` com pedidos completos (mesmos campos da
+  consulta por ID), incluindo número `id`, `items[].product_name`,
+  `items[].quantity`, observações do pedido em `notes` e pagamento.
+- Somente pagamento `pago` e status `recebido`, `em_preparo` ou `pronto`.
+- Ordenação crescente por `payment.paid_at`, com desempate por `id`;
+  representa a chegada à cozinha após liberação. Sem truncamento ou limite padrão.
+- `status` opcional aceita apenas os três status da fila; demais valores retornam `400`.
+- A listagem geral `GET /orders` mantém seu contrato anterior e não representa a fila.
+- Guia de integração e reconexão: [Cozinha e SSE](kitchen_sse.md).
 
 ---
 
@@ -336,9 +352,10 @@ variar; use os campos de `data`, não compare mensagens de sucesso.
 ```
 *Valores aceitos para `method`:* `dinheiro`, `cartao`, `pix`.
 `method` é obrigatório; `amount` é opcional. Omitido ou `null`, usa o total do
-pedido. Nas telas, prefira omiti-lo. O backend atual não exige que um valor
-explícito seja igual ao total. Erros: `400` método ausente/inválido, valor não
-conversível em número ou pagamento já registrado; `404` pedido inexistente.
+pedido. Nas telas, prefira omiti-lo. Valor explícito deve ser finito, positivo e
+igual ao total. Erros: `400` método/valor inválido ou pagamento já registrado;
+`404` pedido inexistente; `409` pedido fora de `recebido`.
+Somente após persistir o pagamento é emitido `new_order`, liberando para a cozinha.
 - **Response `201 Created`:**
 ```json
 {
@@ -370,7 +387,16 @@ conversível em número ou pagamento já registrado; `404` pedido inexistente.
 - **Endpoint:** `GET /api/v1/events/orders`
 - **Protocolo:** Server-Sent Events (`text/event-stream`)
 - **Acesso:** Público
-- **Comportamento:** Mantém a conexão aberta e envia mensagens sempre que um pedido é criado ou tem seu status alterado.
+- **Comportamento:** Mantém a conexão aberta. `new_order` é emitido após o pagamento
+  persistido, com `order_id` e o pedido completo; criar sem pagar não emite evento.
+  `order_status_updated` é emitido após mudança persistida e `order_ready` também
+  é emitido ao chegar a `pronto`. Operações rejeitadas não emitem eventos.
+- `connected` inclui `resync_required: true` e `state_url: /api/v1/orders/kitchen`;
+  em toda conexão/reconexão, consultar essa API com JWT. O stream permanece público,
+  conforme contrato existente. Não enviar JWT na URL.
+- `retry: 3000` orienta reconexão; comentários de heartbeat a cada 15 segundos ociosos.
+  Não há histórico/replay via `Last-Event-ID`. Em fila saturada, o stream encerra
+  para forçar reconexão e recuperação por API. Ver [protocolo de recuperação](kitchen_sse.md).
 - **Formato dos Eventos Emitidos:**
 ```text
 event: order_status_updated

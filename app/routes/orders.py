@@ -1,7 +1,10 @@
 from flask import Blueprint, request, jsonify
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import selectinload
 from app.extensions import db
 from app.models.order import Order, OrderItem, OrderStatus
 from app.models.product import Product
+from app.models.payment import Payment, PaymentStatus
 from app.services.sse_service import sse_broker
 from app.utils.auth_decorator import role_required
 
@@ -69,16 +72,6 @@ def create_order():
 
     order_dict = order.to_dict()
 
-    # Emite notificação SSE para o painel da cozinha
-    sse_broker.publish("new_order", {
-        "order_id": order.id,
-        "customer_name": order.customer_name,
-        "table_number": order.table_number,
-        "status": order.status,
-        "total_amount": float(order.total_amount),
-        "items_count": len(order.items)
-    })
-
     return jsonify({
         "success": True,
         "message": "Pedido criado com sucesso.",
@@ -109,6 +102,27 @@ def list_orders():
         "data": [o.to_dict(include_items=False) for o in orders]
     }), 200
 
+@orders_bp.route("/orders/kitchen", methods=["GET"])
+@role_required("barista", "atendente", "admin")
+def kitchen_queue():
+    """Estado completo da fila, inclusive para recuperação após reconexão SSE."""
+    status_filter = request.args.get("status")
+    if status_filter is not None and status_filter not in OrderStatus.KITCHEN:
+        return jsonify({"success": False, "error": "Status inválido para a cozinha.",
+                        "status_code": 400}), 400
+
+    query = Order.query.join(Payment).filter(
+        Payment.status == PaymentStatus.PAGO,
+        Order.status.in_(OrderStatus.KITCHEN),
+    ).options(selectinload(Order.items).selectinload(OrderItem.product),
+              selectinload(Order.payment))
+    if status_filter:
+        query = query.filter(Order.status == status_filter)
+    orders = query.order_by(Payment.paid_at.asc(), Order.id.asc()).all()
+    return jsonify({"success": True, "count": len(orders),
+                    "data": [order.to_dict() for order in orders]}), 200
+
+
 @orders_bp.route("/orders/<int:order_id>", methods=["GET"])
 def get_order(order_id):
     """Consultar detalhes completos de um pedido pelo ID."""
@@ -138,7 +152,8 @@ def update_order_status(order_id):
         }), 404
 
     data = request.get_json(silent=True) or {}
-    new_status = data.get("status", "").strip().lower()
+    value = data.get("status") if isinstance(data, dict) else None
+    new_status = value.strip().lower() if isinstance(value, str) else ""
 
     if new_status not in OrderStatus.ALL:
         return jsonify({
@@ -147,8 +162,31 @@ def update_order_status(order_id):
             "status_code": 400
         }), 400
 
-    order.status = new_status
-    db.session.commit()
+    if new_status not in OrderStatus.TRANSITIONS.get(order.status, set()):
+        return jsonify({"success": False, "error": "Transição de status não permitida.",
+                        "status_code": 409}), 409
+
+    if new_status != OrderStatus.CANCELADO and (
+        not order.payment or order.payment.status != PaymentStatus.PAGO
+    ):
+        return jsonify({"success": False, "error": "Pedido ainda não foi pago/liberado.",
+                        "status_code": 409}), 409
+
+    # Compare-and-set evita dois avanços concorrentes a partir do mesmo estado.
+    previous_status = order.status
+    try:
+        changed = Order.query.filter_by(id=order.id, status=previous_status).update(
+            {Order.status: new_status}, synchronize_session=False
+        )
+        if not changed:
+            db.session.rollback()
+            return jsonify({"success": False, "error": "Pedido atualizado por outra requisição.",
+                            "status_code": 409}), 409
+        db.session.commit()
+    except SQLAlchemyError:
+        db.session.rollback()
+        return jsonify({"success": False, "error": "Falha ao atualizar pedido.",
+                        "status_code": 500}), 500
 
     # Dispara evento em tempo real para os ouvintes SSE
     event_data = {
