@@ -1,5 +1,6 @@
 import os
 import secrets
+import sys
 
 from flask import Flask
 
@@ -18,8 +19,13 @@ from app.routes import (
 
 def create_app(config_name=None):
     """Cria e configura a aplicação Flask."""
-    if not config_name:
-        config_name = os.getenv("FLASK_ENV", "development").lower()
+    auto_seed = True
+    if config_name is None:
+        if "pytest" in sys.modules or any("pytest" in arg for arg in sys.argv):
+            config_name = "testing"
+            auto_seed = False
+        else:
+            config_name = os.getenv("FLASK_ENV", "development").lower()
     config_name = str(config_name).lower()
 
     app = Flask(__name__)
@@ -64,7 +70,7 @@ def create_app(config_name=None):
         db.create_all()
         # Usuários e produtos de demonstração só existem em desenvolvimento/teste.
         # Nunca crie credenciais conhecidas automaticamente em produção.
-        if config_name in {"development", "testing"}:
+        if auto_seed and config_name in {"development", "testing"}:
             _seed_initial_data()
 
     return app

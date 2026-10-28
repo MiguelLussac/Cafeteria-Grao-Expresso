@@ -8,6 +8,7 @@ class SSEBroker:
 
     def __init__(self):
         self._listeners = []
+        self.events = []
         self._lock = threading.Lock()
 
     def subscribe(self) -> queue.Queue:
@@ -27,6 +28,7 @@ class SSEBroker:
         """Dispara um evento para todos os clientes conectados."""
         message = f"event: {event}\ndata: {json.dumps(data)}\n\n"
         with self._lock:
+            self.events.append((event, data.copy()))
             to_remove = []
             for q in self._listeners:
                 try:
