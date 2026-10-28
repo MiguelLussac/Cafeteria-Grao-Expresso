@@ -1,18 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { listProducts } from '../services/api'
-import { CATEGORIES, formatPrice } from '../utils/format'
-import { Alert, Button, CategoryBadge, EmptyState, Loading } from '../components/ui'
-
-function ProductCard({ product }) {
-  return (
-    <article className="product-card">
-      <CategoryBadge category={product.category} />
-      <h3>{product.name}</h3>
-      {product.description && <p>{product.description}</p>}
-      <strong className="product-price">{formatPrice(product.price)}</strong>
-    </article>
-  )
-}
+import { CATEGORIES } from '../utils/format'
+import { Alert, Button, EmptyState, Loading } from '../components/ui'
+import ProductCard from '../components/ProductCard'
+import ProductSelection from '../components/ProductSelection'
 
 function itemsLabel(n) {
   return `${n} ${n === 1 ? 'item' : 'itens'}`
@@ -27,7 +18,7 @@ export default function MenuPage() {
   const load = useCallback(async () => {
     setStatus('loading')
     try {
-      setProducts(await listProducts())
+      setProducts((await listProducts()).filter((product) => product.is_active))
       setStatus('ready')
     } catch (err) {
       setError(err.message)
@@ -59,6 +50,8 @@ export default function MenuPage() {
           <p className="page-subtitle">Cafés, doces e salgados preparados todos os dias.</p>
         </div>
       </header>
+
+      <ProductSelection />
 
       {status === 'loading' && <Loading text="Carregando cardápio..." />}
 
