@@ -1,82 +1,120 @@
+from decimal import Decimal
 from flask import Blueprint, request, jsonify
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import selectinload
+
 from app.extensions import db
 from app.models.order import Order, OrderItem, OrderStatus
-from app.models.product import Product
 from app.models.payment import Payment, PaymentStatus
+from app.models.product import Product
 from app.services.sse_service import sse_broker
 from app.utils.auth_decorator import role_required
 
 orders_bp = Blueprint("orders", __name__)
 
+def _erro(mensagem, status=400):
+    return jsonify({
+        "success": False,
+        "error": mensagem,
+        "status_code": status
+    }), status
+
+
+def _texto_opcional(data, campo, padrao=""):
+    """Lê um campo de texto opcional. Retorna (valor, erro)."""
+    valor = data.get(campo)
+    if valor is None:
+        return padrao, None
+    if not isinstance(valor, str):
+        return None, f"O campo '{campo}' deve ser um texto."
+    return valor.strip() or padrao, None
+
+
 @orders_bp.route("/orders", methods=["POST"])
 def create_order():
     """Criação de um novo pedido (usado pelo Totem ou pelo Atendente)."""
-    data = request.get_json(silent=True) or {}
-    items_data = data.get("items", [])
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return _erro("Envie um JSON com a lista 'items'.")
 
+    items_data = data.get("items")
     if not items_data or not isinstance(items_data, list):
-        return jsonify({
-            "success": False,
-            "error": "O pedido deve conter ao menos um item na lista 'items'.",
-            "status_code": 400
-        }), 400
+        return _erro("O pedido deve conter ao menos um item na lista 'items'.")
 
-    order = Order(
-        customer_name=data.get("customer_name", "").strip() or "Balcão",
-        table_number=data.get("table_number", "").strip() or "Retirada",
-        notes=data.get("notes", "").strip(),
-        status=OrderStatus.RECEBIDO,
-        total_amount=0.00
-    )
-    db.session.add(order)
-    db.session.flush()
+    customer_name, err = _texto_opcional(data, "customer_name", "Balcão")
+    if err:
+        return _erro(err)
+    table_number, err = _texto_opcional(data, "table_number", "Retirada")
+    if err:
+        return _erro(err)
+    notes, err = _texto_opcional(data, "notes", "")
+    if err:
+        return _erro(err)
 
-    total = 0.00
+    validated = []
+    total = Decimal("0.00")
     for item_input in items_data:
+        if not isinstance(item_input, dict):
+            return _erro("Cada item deve ser um objeto com 'product_id' e 'quantity'.")
+
         product_id = item_input.get("product_id")
         quantity = item_input.get("quantity", 1)
 
-        if not product_id or quantity <= 0:
-            db.session.rollback()
-            return jsonify({
-                "success": False,
-                "error": "Cada item deve possuir 'product_id' e 'quantity' maior que 0.",
-                "status_code": 400
-            }), 400
+        if (isinstance(product_id, bool) or not isinstance(product_id, int) or product_id <= 0
+                or isinstance(quantity, bool) or not isinstance(quantity, int) or quantity <= 0):
+            return _erro("Cada item deve possuir 'product_id' e 'quantity' inteiros e maiores que 0.")
 
         product = Product.query.get(product_id)
         if not product or not product.is_active:
-            db.session.rollback()
-            return jsonify({
-                "success": False,
-                "error": f"Produto com ID {product_id} não encontrado ou inativo.",
-                "status_code": 400
-            }), 400
+            return _erro(f"Produto com ID {product_id} não encontrado ou inativo.")
 
-        unit_price = float(product.price)
-        subtotal = unit_price * quantity
-        total += subtotal
+        unit_price = Decimal(str(product.price)).quantize(Decimal("0.01"))
+        total += unit_price * quantity
+        validated.append((product.id, quantity, unit_price))
 
-        order_item = OrderItem(
-            order_id=order.id,
-            product_id=product.id,
-            quantity=quantity,
-            unit_price=unit_price
+    try:
+        order = Order(
+            customer_name=customer_name,
+            table_number=table_number,
+            notes=notes,
+            status=OrderStatus.RECEBIDO,
+            total_amount=total
         )
-        db.session.add(order_item)
+        db.session.add(order)
+        db.session.flush()
 
-    order.total_amount = round(total, 2)
-    db.session.commit()
+        for product_id, quantity, unit_price in validated:
+            db.session.add(OrderItem(
+                order_id=order.id,
+                product_id=product_id,
+                quantity=quantity,
+                unit_price=unit_price
+            ))
+        db.session.commit()
+    except SQLAlchemyError:
+        db.session.rollback()
+        return _erro("Não foi possível registrar o pedido. Nada foi salvo.", 500)
 
     order_dict = order.to_dict()
+
+    try:
+        sse_broker.events.append(("new_order", {
+            "order_id": order.id,
+            "customer_name": order.customer_name,
+            "table_number": order.table_number,
+            "status": order.status,
+            "total_amount": float(order.total_amount),
+            "items_count": len(order.items)
+        }))
+    except Exception:
+        pass
 
     return jsonify({
         "success": True,
         "message": "Pedido criado com sucesso.",
         "data": order_dict
     }), 201
+
 
 @orders_bp.route("/orders", methods=["GET"])
 def list_orders():
@@ -102,6 +140,7 @@ def list_orders():
         "data": [o.to_dict(include_items=False) for o in orders]
     }), 200
 
+
 @orders_bp.route("/orders/kitchen", methods=["GET"])
 @role_required("barista", "atendente", "admin")
 def kitchen_queue():
@@ -114,8 +153,10 @@ def kitchen_queue():
     query = Order.query.join(Payment).filter(
         Payment.status == PaymentStatus.PAGO,
         Order.status.in_(OrderStatus.KITCHEN),
-    ).options(selectinload(Order.items).selectinload(OrderItem.product),
-              selectinload(Order.payment))
+    ).options(
+        selectinload(Order.items).selectinload(OrderItem.product),
+        selectinload(Order.payment)
+    )
     if status_filter:
         query = query.filter(Order.status == status_filter)
     orders = query.order_by(Payment.paid_at.asc(), Order.id.asc()).all()
@@ -139,6 +180,7 @@ def get_order(order_id):
         "data": order.to_dict(include_items=True)
     }), 200
 
+
 @orders_bp.route("/orders/<int:order_id>/status", methods=["PATCH"])
 @role_required("barista", "atendente", "admin")
 def update_order_status(order_id):
@@ -152,8 +194,20 @@ def update_order_status(order_id):
         }), 404
 
     data = request.get_json(silent=True) or {}
-    value = data.get("status") if isinstance(data, dict) else None
-    new_status = value.strip().lower() if isinstance(value, str) else ""
+    if not isinstance(data, dict):
+        return jsonify({
+            "success": False,
+            "error": "Status inválido. Opções válidas: " + ", ".join(OrderStatus.ALL),
+            "status_code": 400
+        }), 400
+    value = data.get("status")
+    if not isinstance(value, str):
+        return jsonify({
+            "success": False,
+            "error": "Status inválido. Opções válidas: " + ", ".join(OrderStatus.ALL),
+            "status_code": 400
+        }), 400
+    new_status = value.strip().lower()
 
     if new_status not in OrderStatus.ALL:
         return jsonify({
@@ -172,7 +226,6 @@ def update_order_status(order_id):
         return jsonify({"success": False, "error": "Pedido ainda não foi pago/liberado.",
                         "status_code": 409}), 409
 
-    # Compare-and-set evita dois avanços concorrentes a partir do mesmo estado.
     previous_status = order.status
     try:
         changed = Order.query.filter_by(id=order.id, status=previous_status).update(
@@ -188,7 +241,6 @@ def update_order_status(order_id):
         return jsonify({"success": False, "error": "Falha ao atualizar pedido.",
                         "status_code": 500}), 500
 
-    # Dispara evento em tempo real para os ouvintes SSE
     event_data = {
         "order_id": order.id,
         "customer_name": order.customer_name,

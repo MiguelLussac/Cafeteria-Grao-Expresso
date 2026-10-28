@@ -9,7 +9,7 @@ class Product(db.Model):
     name = db.Column(db.String(120), nullable=False, index=True)
     description = db.Column(db.Text, nullable=True)
     price = db.Column(db.Numeric(10, 2), nullable=False)
-    category = db.Column(db.String(50), nullable=False, index=True)  # bebidas, doces, salgados
+    category = db.Column(db.String(50), nullable=False, default="bebidas", index=True)  # bebidas, doces, salgados
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
