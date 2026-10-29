@@ -30,10 +30,13 @@ export function orderPayload(items, details) {
     !Number.isInteger(item.quantity) || item.quantity <= 0)) {
     throw new Error('Revise os produtos e as quantidades antes de confirmar.')
   }
+  if (!['Mesa', 'Retirada'].includes(details.table_number)) {
+    throw new Error('Escolha Mesa ou Retirada antes de confirmar o pedido.')
+  }
   return {
     items: items.map(({ id, quantity }) => ({ product_id: id, quantity })),
     customer_name: details.customer_name.trim(),
-    table_number: details.table_number.trim(),
+    table_number: details.table_number,
     notes: details.notes.trim(),
   }
 }

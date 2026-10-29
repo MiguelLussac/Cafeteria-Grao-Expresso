@@ -57,9 +57,18 @@ export default function OrderSummaryPage() {
               <Field label="Seu nome" id="customer_name" optional>
                 <input id="customer_name" name="customer_name" maxLength={120} value={details.customer_name} onChange={change} placeholder="Balcão" />
               </Field>
-              <Field label="Mesa ou retirada" id="table_number" optional>
-                <input id="table_number" name="table_number" maxLength={50} value={details.table_number} onChange={change} placeholder="Retirada" />
-              </Field>
+              <fieldset className="order-service-mode">
+                <legend>Mesa ou retirada <span className="required">(obrigatório)</span></legend>
+                <div className="order-service-options">
+                  {['Mesa', 'Retirada'].map((option) => (
+                    <label key={option}>
+                      <input type="radio" name="table_number" value={option}
+                        checked={details.table_number === option} onChange={change} required />
+                      {option}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
             </div>
             <Field label="Observações do pedido" id="notes" optional>
               <textarea id="notes" name="notes" value={details.notes} onChange={change} placeholder="Ex.: café sem açúcar" />
