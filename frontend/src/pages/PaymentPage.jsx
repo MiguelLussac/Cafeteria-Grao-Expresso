@@ -36,7 +36,7 @@ function Confirmation({ order }) {
   return (
     <div className="card payment-confirmation" role="status">
       <CheckCircle2 className="payment-confirmation-icon" size={56} aria-hidden="true" />
-      <h1>Pagamento simulado confirmado!</h1>
+      <h1>Pagamento confirmado!</h1>
       <p className="page-subtitle">
         {formatPrice(order.payment.amount)} · {paymentMethodLabel(order.payment.method)}
       </p>
@@ -44,7 +44,7 @@ function Confirmation({ order }) {
         <span>Número do seu pedido</span>
         <strong>{order.id}</strong>
       </div>
-      <p>Aguarde: avisaremos quando o seu pedido estiver pronto para retirada.</p>
+      <p>Aguarde: seu pedido está sendo preparado. Acompanhe na TV do balcão o status do seu pedido!</p>
       <Link to="/" className="btn btn-outline">
         Voltar ao cardápio
       </Link>

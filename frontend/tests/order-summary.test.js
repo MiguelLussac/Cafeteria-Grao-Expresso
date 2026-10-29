@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { addProduct, changeQuantity, removeProduct, itemsQuantity,
   createOrderSubmitter, estimatedTotal, orderPayload } from '../src/utils/order.js'
 
-const details = { customer_name: ' Miguel ', table_number: ' Mesa 2 ', notes: ' Sem açúcar ' }
+const details = { customer_name: ' Miguel ', table_number: 'Mesa', notes: ' Sem açúcar ' }
 const items = [
   { id: 1, name: 'Café', price: 6.5, quantity: 2 },
   { id: 2, name: 'Pão', price: 7, quantity: 3 },
@@ -43,9 +43,20 @@ test('resumo calcula unidades e total estimado de um ou vários produtos', () =>
 
 test('confirmação envia somente identificação, observações, IDs e quantidades', () => {
   assert.deepEqual(orderPayload(items, details), {
-    customer_name: 'Miguel', table_number: 'Mesa 2', notes: 'Sem açúcar',
+    customer_name: 'Miguel', table_number: 'Mesa', notes: 'Sem açúcar',
     items: [{ product_id: 1, quantity: 2 }, { product_id: 2, quantity: 3 }],
   })
+})
+
+test('Mesa ou Retirada é obrigatório e aceita somente uma opção válida', () => {
+  let calls = 0
+  const submit = createOrderSubmitter(() => { calls++ })
+  for (const table_number of ['', undefined, null, 'Mesa e Retirada', ['Mesa', 'Retirada']]) {
+    assert.throws(() => submit(items, { ...details, table_number }), /Escolha Mesa ou Retirada/)
+  }
+  assert.equal(calls, 0)
+  assert.equal(orderPayload(items, details).table_number, 'Mesa')
+  assert.equal(orderPayload(items, { ...details, table_number: 'Retirada' }).table_number, 'Retirada')
 })
 
 test('pedido vazio ou quantidade inválida não chama API', () => {
