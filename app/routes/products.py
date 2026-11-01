@@ -1,6 +1,7 @@
 import math
-from decimal import Decimal, InvalidOperation
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from functools import wraps
+from urllib.parse import urlparse
 
 from flask import Blueprint, current_app, request, jsonify
 from sqlalchemy.exc import SQLAlchemyError
@@ -12,9 +13,71 @@ from app.utils.auth_decorator import role_required
 products_bp = Blueprint("products", __name__)
 
 VALID_CATEGORIES = ("bebidas", "doces", "salgados")
-PRODUCT_FIELDS = {"name", "description", "price", "category"}
+PRODUCT_FIELDS = {"name", "description", "price", "category", "image_url", "nutrition"}
 MAX_PRICE = Decimal("99999999.99")
 CENT = Decimal("0.01")
+MAX_IMAGE_URL_LENGTH = 500
+
+# Campo da tabela nutricional -> valor máximo aceito (por porção).
+NUTRITION_LIMITS = {
+    "serving_size_g": Decimal("5000"),
+    "calories_kcal": Decimal("10000"),
+    "protein_g": Decimal("5000"),
+    "carbs_g": Decimal("5000"),
+    "fat_g": Decimal("5000"),
+}
+NUTRITION_SOURCES = ("manual", "ai")
+TENTH = Decimal("0.1")
+
+
+def _validate_image_url(value):
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return None, None
+    if not isinstance(value, str):
+        return None, "O campo 'image_url' deve ser um texto."
+    value = value.strip()
+    if len(value) > MAX_IMAGE_URL_LENGTH:
+        return None, f"O campo 'image_url' deve ter no máximo {MAX_IMAGE_URL_LENGTH} caracteres."
+    parsed = urlparse(value)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        return None, "O campo 'image_url' deve ser um endereço http(s) válido."
+    return value, None
+
+
+def _validate_nutrition(value):
+    """Retorna as colunas da tabela nutricional; None limpa todos os campos."""
+    if value is None:
+        return {field: None for field in (*NUTRITION_LIMITS, "nutrition_source")}, None
+    if not isinstance(value, dict):
+        return None, "O campo 'nutrition' deve ser um objeto ou null."
+
+    unknown = set(value) - set(NUTRITION_LIMITS) - {"source"}
+    if unknown:
+        return None, f"Campos não permitidos em 'nutrition': {', '.join(sorted(unknown))}."
+    missing = [field for field in NUTRITION_LIMITS if field not in value]
+    if missing:
+        return None, f"Informe todos os campos da tabela nutricional: {', '.join(missing)}."
+
+    columns = {}
+    for field, limit in NUTRITION_LIMITS.items():
+        number = value[field]
+        if isinstance(number, bool) or not isinstance(number, (int, float)) or not math.isfinite(number):
+            return None, f"O campo 'nutrition.{field}' deve ser numérico."
+        number = Decimal(str(number)).quantize(TENTH, rounding=ROUND_HALF_UP)
+        if number < 0 or number > limit:
+            return None, f"O campo 'nutrition.{field}' deve estar entre 0 e {limit}."
+        columns[field] = number
+
+    if columns["serving_size_g"] <= 0:
+        return None, "O campo 'nutrition.serving_size_g' deve ser maior que zero."
+    if columns["protein_g"] + columns["carbs_g"] + columns["fat_g"] > columns["serving_size_g"]:
+        return None, "A soma de proteínas, carboidratos e gorduras não pode passar do tamanho da porção."
+
+    source = value.get("source", "manual")
+    if source not in NUTRITION_SOURCES:
+        return None, f"O campo 'nutrition.source' deve ser um destes: {', '.join(NUTRITION_SOURCES)}."
+    columns["nutrition_source"] = source
+    return columns, None
 
 
 def _validate_product_data(data, *, partial=False):
@@ -70,6 +133,18 @@ def _validate_product_data(data, *, partial=False):
         if description is not None and not isinstance(description, str):
             return None, "O campo 'description' deve ser um texto."
         validated["description"] = description.strip() if description else ""
+
+    if "image_url" in data:
+        image_url, error = _validate_image_url(data["image_url"])
+        if error:
+            return None, error
+        validated["image_url"] = image_url
+
+    if "nutrition" in data:
+        nutrition, error = _validate_nutrition(data["nutrition"])
+        if error:
+            return None, error
+        validated.update(nutrition)
 
     if "is_active" in data:
         return None, "Campos não permitidos: is_active."
@@ -194,13 +269,8 @@ def create_product():
     if error:
         return _validation_error(error)
 
-    product = Product(
-        name=product_data["name"],
-        description=product_data.get("description", ""),
-        price=product_data["price"],
-        category=product_data["category"],
-        is_active=True
-    )
+    product_data.setdefault("description", "")
+    product = Product(**product_data, is_active=True)
     try:
         db.session.add(product)
         db.session.commit()

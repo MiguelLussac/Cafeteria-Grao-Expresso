@@ -3,13 +3,18 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
 import { createProduct, getProduct, updateProduct } from '../services/api'
 import { CATEGORIES, parsePrice, priceToInput } from '../utils/format'
+import { EMPTY_NUTRITION, NUTRITION_FIELDS, isValidImageUrl, nutritionToInputs,
+  parseNutritionInputs } from '../utils/nutrition'
 import { Alert, Button, Field, Loading } from '../components/ui'
 
 const DESCRIPTION_MAX = 200
-const EMPTY = { name: '', description: '', price: '', category: '' }
+const EMPTY = { name: '', description: '', price: '', category: '', image_url: '' }
 
-function validate(values) {
-  const errors = {}
+function validate(values, nutritionValues, nutritionSource) {
+  const { nutrition, errors: nutritionErrors } = parseNutritionInputs(nutritionValues, nutritionSource)
+  const errors = Object.fromEntries(
+    Object.entries(nutritionErrors).map(([key, message]) => [`nutrition.${key}`, message]),
+  )
   if (!values.name.trim()) errors.name = 'Informe o nome do produto.'
   const price = parsePrice(values.price)
   if (Number.isNaN(price)) errors.price = 'Informe um preço válido.'
@@ -18,7 +23,10 @@ function validate(values) {
   if (values.description.length > DESCRIPTION_MAX) {
     errors.description = `Use no máximo ${DESCRIPTION_MAX} caracteres.`
   }
-  return errors
+  if (!isValidImageUrl(values.image_url)) {
+    errors.image_url = 'Informe um endereço que comece com http:// ou https://.'
+  }
+  return { errors, nutrition }
 }
 
 // Usada para cadastro (/admin/produtos/novo) e edição (/admin/produtos/:id/editar).
@@ -28,6 +36,10 @@ export default function ProductFormPage() {
   const navigate = useNavigate()
 
   const [values, setValues] = useState(EMPTY)
+  const [nutritionValues, setNutritionValues] = useState(EMPTY_NUTRITION)
+  // Origem da tabela ("manual" ou "ai"); editar qualquer valor torna-a manual.
+  const [nutritionSource, setNutritionSource] = useState('manual')
+  const [previewFailed, setPreviewFailed] = useState(false)
   const [errors, setErrors] = useState({})
   const [submitError, setSubmitError] = useState('')
   const [status, setStatus] = useState(isEdit ? 'loading' : 'ready')
@@ -42,7 +54,10 @@ export default function ProductFormPage() {
           description: p.description ?? '',
           price: priceToInput(p.price),
           category: p.category,
+          image_url: p.image_url ?? '',
         })
+        setNutritionValues(nutritionToInputs(p.nutrition))
+        setNutritionSource(p.nutrition?.source ?? 'manual')
         setStatus('ready')
       })
       .catch((err) => {
@@ -54,11 +69,19 @@ export default function ProductFormPage() {
   function update(field, value) {
     setValues((v) => ({ ...v, [field]: value }))
     if (errors[field]) setErrors((e) => ({ ...e, [field]: undefined }))
+    if (field === 'image_url') setPreviewFailed(false)
+  }
+
+  function updateNutrition(field, value) {
+    setNutritionValues((v) => ({ ...v, [field]: value }))
+    setNutritionSource('manual')
+    const key = `nutrition.${field}`
+    if (errors[key]) setErrors((e) => ({ ...e, [key]: undefined }))
   }
 
   async function handleSubmit(event) {
     event.preventDefault()
-    const found = validate(values)
+    const { errors: found, nutrition } = validate(values, nutritionValues, nutritionSource)
     setErrors(found)
     setSubmitError('')
     if (Object.keys(found).length > 0) return
@@ -68,6 +91,8 @@ export default function ProductFormPage() {
       description: values.description.trim(),
       price: parsePrice(values.price),
       category: values.category,
+      image_url: values.image_url.trim() || null,
+      nutrition,
     }
 
     setSubmitting(true)
@@ -173,6 +198,65 @@ export default function ProductFormPage() {
               </select>
             </Field>
           </div>
+
+          <Field
+            label="URL da imagem"
+            id="image_url"
+            optional
+            error={errors.image_url}
+            hint="Link direto para uma foto (.jpg, .png ou .webp)."
+          >
+            <input
+              id="image_url"
+              type="url"
+              inputMode="url"
+              placeholder="https://..."
+              value={values.image_url}
+              aria-invalid={!!errors.image_url}
+              onChange={(e) => update('image_url', e.target.value)}
+            />
+          </Field>
+          {values.image_url.trim() && isValidImageUrl(values.image_url) && (
+            previewFailed
+              ? <p className="form-note">Não foi possível carregar a imagem deste endereço.</p>
+              : (
+                <img
+                  className="image-preview"
+                  src={values.image_url.trim()}
+                  alt="Pré-visualização da imagem do produto"
+                  onError={() => setPreviewFailed(true)}
+                />
+              )
+          )}
+
+          <fieldset className="form-section">
+            <legend>
+              Tabela nutricional <span className="optional">(opcional)</span>
+            </legend>
+            <p className="form-note">
+              Valores médios por porção. Preencha todos os campos ou deixe todos vazios.
+              {nutritionSource === 'ai' && ' Valores atuais estimados por IA; revise antes de salvar.'}
+            </p>
+            <div className="nutrition-grid">
+              {NUTRITION_FIELDS.map((f) => (
+                <Field
+                  key={f.key}
+                  label={`${f.label} (${f.unit})`}
+                  id={`nutrition-${f.key}`}
+                  error={errors[`nutrition.${f.key}`]}
+                >
+                  <input
+                    id={`nutrition-${f.key}`}
+                    inputMode="decimal"
+                    placeholder="0"
+                    value={nutritionValues[f.key]}
+                    aria-invalid={!!errors[`nutrition.${f.key}`]}
+                    onChange={(e) => updateNutrition(f.key, e.target.value.replace(/[^\d.,]/g, ''))}
+                  />
+                </Field>
+              ))}
+            </div>
+          </fieldset>
 
           <p className="form-note"><span className="required">*</span> Campos obrigatórios</p>
 

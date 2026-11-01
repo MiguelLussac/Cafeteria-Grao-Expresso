@@ -3,6 +3,8 @@ import secrets
 import sys
 
 from flask import Flask
+from flask_migrate import stamp, upgrade
+from sqlalchemy import inspect
 
 from app.config import config_by_name
 from app.extensions import cors, db, migrate
@@ -15,6 +17,11 @@ from app.routes import (
     payments_bp,
     products_bp,
 )
+
+
+MIGRATIONS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "migrations")
+# Revisão que corresponde ao schema criado pelo antigo db.create_all().
+BASELINE_REVISION = "1f88bbface9a"
 
 
 def create_app(config_name=None):
@@ -55,7 +62,7 @@ def create_app(config_name=None):
                 app.config[setting] = secrets.token_urlsafe(48)
 
     db.init_app(app)
-    migrate.init_app(app, db)
+    migrate.init_app(app, db, directory=MIGRATIONS_DIR, render_as_batch=True)
     cors.init_app(app, resources={r"/api/*": {"origins": "*"}})
     register_error_handlers(app)
 
@@ -67,13 +74,26 @@ def create_app(config_name=None):
     app.register_blueprint(events_bp, url_prefix="/api/v1")
 
     with app.app_context():
-        db.create_all()
+        if config_name == "testing":
+            db.create_all()
+        else:
+            _upgrade_database()
         # Usuários e produtos de demonstração só existem em desenvolvimento/teste.
         # Nunca crie credenciais conhecidas automaticamente em produção.
         if auto_seed and config_name in {"development", "testing"}:
             _seed_initial_data()
 
     return app
+
+
+def _upgrade_database():
+    """Aplica as migrações pendentes (migrations/) ao iniciar a API."""
+    tables = set(inspect(db.engine).get_table_names())
+    if "products" in tables and "alembic_version" not in tables:
+        # Banco criado pelo create_all() antes das migrações existirem:
+        # marca o schema inicial como aplicado para seguir só com as novas.
+        stamp(directory=MIGRATIONS_DIR, revision=BASELINE_REVISION)
+    upgrade(directory=MIGRATIONS_DIR)
 
 
 def _seed_initial_data():

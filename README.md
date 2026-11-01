@@ -98,6 +98,15 @@ A API iniciará por padrão em `http://127.0.0.1:5000`.
 
 O banco de dados SQLite local (`grao_expresso.db`) será criado automaticamente com dados semente (usuários de teste e itens de cardápio).
 
+#### Migrações do banco (Flask-Migrate)
+Ao iniciar, a API aplica sozinha as migrações pendentes da pasta `migrations/`. Bancos criados antes das migrações existirem são reconhecidos e atualizados sem perder dados.
+
+Ao alterar um model (nova coluna, nova tabela), gere a migração e faça commit dela junto com o código:
+```bash
+flask --app run db migrate -m "descrição da mudança"
+```
+Revise o arquivo gerado em `migrations/versions/` antes do commit.
+
 ### Cadastrar e consultar um produto
 
 Por padrão, a aplicação usa SQLite local. Em outro terminal, faça login com um usuário padrão (por exemplo, `atendente` / `atendente123`) e copie o valor de `data.token` da resposta:
