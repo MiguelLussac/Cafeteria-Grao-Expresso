@@ -26,6 +26,8 @@ wheels/
 # Ambiente e Configurações
 .env
 .venv
+# Token pessoal da CLI do Supabase (usado com `source .supabase.env`)
+.supabase.env
 
 # Banco de dados local SQLite
 *.db
