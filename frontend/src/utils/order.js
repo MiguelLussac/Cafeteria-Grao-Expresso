@@ -4,7 +4,9 @@ export function addProduct(items, product) {
     !Number.isFinite(product.price) || product.price <= 0) return items
   const current = items.find((item) => item.id === product.id)
   if (current) return changeQuantity(items, product.id, current.quantity + 1)
-  return [...items, { id: product.id, name: product.name, price: product.price, quantity: 1 }]
+  // category e nutrition alimentam a miniatura e as calorias na revisão do pedido.
+  return [...items, { id: product.id, name: product.name, price: product.price, quantity: 1,
+    category: product.category, nutrition: product.nutrition ?? null }]
 }
 
 export function changeQuantity(items, id, quantity) {

@@ -13,7 +13,7 @@ test('seleção soma unidades do mesmo produto sem duplicar linhas', () => {
   const product = { id: 1, name: 'Café', price: 6.5, is_active: true }
   const first = addProduct([], product)
   const second = addProduct(first, product)
-  assert.deepEqual(second, [{ id: 1, name: 'Café', price: 6.5, quantity: 2 }])
+  assert.deepEqual(second, [{ id: 1, name: 'Café', price: 6.5, quantity: 2, category: undefined, nutrition: null }])
   assert.equal(first[0].quantity, 1)
   assert.equal(itemsQuantity(second), 2)
 })

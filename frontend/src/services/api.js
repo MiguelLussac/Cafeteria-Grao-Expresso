@@ -138,6 +138,12 @@ export async function updateProduct(id, changes) {
   return res.data
 }
 
+// Pede uma nova estimativa nutricional à IA quando a anterior falhou.
+export async function retryProductNutrition(id) {
+  const res = await request(`/products/${id}/nutrition/retry`, { method: 'POST', auth: true })
+  return res.data
+}
+
 // O backend desativa o produto (soft-delete); exige perfil admin.
 export async function deleteProduct(id) {
   await request(`/products/${id}`, { method: 'DELETE', auth: true })

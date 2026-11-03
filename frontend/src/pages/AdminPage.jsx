@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Pencil, Plus, RotateCcw, Search, Trash2 } from 'lucide-react'
-import { deleteProduct, listProducts, updateProduct } from '../services/api'
+import { Pencil, Plus, RefreshCw, RotateCcw, Search, Sparkles, Trash2 } from 'lucide-react'
+import { deleteProduct, listProducts, retryProductNutrition, updateProduct } from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { CATEGORIES, formatPrice } from '../utils/format'
+import { formatInteger, formatServing, nutritionState } from '../utils/nutrition'
 import {
   Alert,
   Button,
@@ -45,6 +46,29 @@ function DeleteDialog({ product, onCancel, onConfirm, deleting }) {
   )
 }
 
+// Enquanto a IA calcula a tabela de algum produto, a lista se atualiza sozinha.
+const POLL_MS = 5000
+
+function SourceChip({ source }) {
+  return source === 'manual'
+    ? <span className="source-chip source-chip-manual"><Pencil size={12} aria-hidden="true" />Manual</span>
+    : <span className="source-chip"><Sparkles size={12} aria-hidden="true" />IA</span>
+}
+
+function NutritionCell({ product }) {
+  const state = nutritionState(product)
+  if (state === 'pending') {
+    return <span className="kcal-chip kcal-chip-pending" role="status"><Sparkles size={12} aria-hidden="true" />Calculando…</span>
+  }
+  if (state === 'unavailable') return <span className="kcal-chip kcal-chip-unavailable">Indisponível</span>
+  return (
+    <span className="nutrition-cell">
+      <SourceChip source={product.nutrition.source} />
+      <span><strong>{formatInteger(product.nutrition.calories_kcal)} kcal</strong> · {formatServing(product.nutrition)}</span>
+    </span>
+  )
+}
+
 export default function AdminPage() {
   const { user } = useAuth()
   const isAdmin = user?.role === 'admin'
@@ -66,11 +90,12 @@ export default function AdminPage() {
     if (location.state?.flash) navigate(location.pathname, { replace: true, state: null })
   }, [location, navigate])
 
-  const load = useCallback(async () => {
+  const load = useCallback(async ({ silent = false } = {}) => {
     try {
       setProducts(await listProducts({ activeOnly: false }))
       setStatus('ready')
     } catch (err) {
+      if (silent) return
       setLoadError(err.message)
       setStatus('error')
     }
@@ -79,6 +104,22 @@ export default function AdminPage() {
   useEffect(() => {
     load()
   }, [load])
+
+  const calculating = products.some((p) => nutritionState(p) === 'pending')
+  useEffect(() => {
+    if (!calculating) return undefined
+    const timer = setInterval(() => load({ silent: true }), POLL_MS)
+    return () => clearInterval(timer)
+  }, [calculating, load])
+
+  async function retryNutrition(product) {
+    try {
+      const updated = await retryProductNutrition(product.id)
+      setProducts((current) => current.map((p) => (p.id === updated.id ? updated : p)))
+    } catch (err) {
+      setFlash({ variant: 'error', title: 'Não foi possível pedir uma nova estimativa.', text: err.message })
+    }
+  }
 
   async function confirmDelete() {
     setDeleting(true)
@@ -126,6 +167,14 @@ export default function AdminPage() {
               {products.length} {products.length === 1 ? 'produto' : 'produtos'}
               {inactiveCount > 0 &&
                 ` · ${inactiveCount} ${inactiveCount === 1 ? 'desativado' : 'desativados'}`}
+              {' · a IA estima a nutrição alguns segundos depois de cada cadastro'}
+            </p>
+          )}
+          {status === 'ready' && (
+            <p className="nutrition-legend">
+              <strong>Nutrição:</strong>
+              <SourceChip source="ai" /> estimada automaticamente
+              <SourceChip source="manual" /> editada pela equipe; a IA não sobrescreve
             </p>
           )}
         </div>
@@ -203,6 +252,7 @@ export default function AdminPage() {
                     <th>Produto</th>
                     <th>Categoria</th>
                     <th className="num">Preço</th>
+                    <th>Nutrição (porção)</th>
                     <th>Situação</th>
                     <th className="actions-col">Ações</th>
                   </tr>
@@ -218,11 +268,18 @@ export default function AdminPage() {
                       </td>
                       <td><CategoryBadge category={p.category} /></td>
                       <td className="num price-cell">{formatPrice(p.price)}</td>
+                      <td className="cell-nutrition"><NutritionCell product={p} /></td>
                       <td><StatusBadge active={p.is_active} /></td>
                       <td>
                         <div className="row-actions">
                           {p.is_active ? (
                             <>
+                              {p.nutrition_status === 'failed' && (
+                                <Button variant="outline" className="btn-sm" onClick={() => retryNutrition(p)}>
+                                  <RefreshCw size={16} aria-hidden="true" />
+                                  Tentar de novo
+                                </Button>
+                              )}
                               <Link to={`/admin/produtos/${p.id}/editar`} className="btn btn-outline btn-sm">
                                 <Pencil size={16} aria-hidden="true" />
                                 Editar

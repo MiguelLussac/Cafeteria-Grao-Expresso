@@ -1,17 +1,23 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, Pencil, Sparkles } from 'lucide-react'
 import { createProduct, getProduct, updateProduct } from '../services/api'
 import { CATEGORIES, parsePrice, priceToInput } from '../utils/format'
-import { EMPTY_NUTRITION, NUTRITION_FIELDS, isValidImageUrl, nutritionToInputs,
-  parseNutritionInputs } from '../utils/nutrition'
+import { EMPTY_NUTRITION, MACROS, NUTRITION_FIELDS, SERVING_UNITS, isValidImageUrl, nutritionState,
+  nutritionToInputs, parseNutritionInputs } from '../utils/nutrition'
 import { Alert, Button, Field, Loading } from '../components/ui'
+import { AiBadge } from '../components/Nutrition'
 
 const DESCRIPTION_MAX = 200
 const EMPTY = { name: '', description: '', price: '', category: '', image_url: '' }
 
-function validate(values, nutritionValues, nutritionSource) {
-  const { nutrition, errors: nutritionErrors } = parseNutritionInputs(nutritionValues, nutritionSource)
+const MACRO_CLASS = Object.fromEntries(MACROS.map((m) => [m.key, m.className]))
+
+// Sem edição manual a tabela não é enviada: continua com a IA (Edge Function "macros").
+function validate(values, nutritionValues, editingNutrition) {
+  const { nutrition, errors: nutritionErrors } = editingNutrition
+    ? parseNutritionInputs(nutritionValues)
+    : { nutrition: undefined, errors: {} }
   const errors = Object.fromEntries(
     Object.entries(nutritionErrors).map(([key, message]) => [`nutrition.${key}`, message]),
   )
@@ -37,8 +43,10 @@ export default function ProductFormPage() {
 
   const [values, setValues] = useState(EMPTY)
   const [nutritionValues, setNutritionValues] = useState(EMPTY_NUTRITION)
-  // Origem da tabela ("manual" ou "ai"); editar qualquer valor torna-a manual.
-  const [nutritionSource, setNutritionSource] = useState('manual')
+  // Produto como veio da API: origem/estado da tabela e texto que a IA usou.
+  const [original, setOriginal] = useState(null)
+  // Valores da IA ficam somente leitura até a equipe escolher editar.
+  const [editingNutrition, setEditingNutrition] = useState(false)
   const [previewFailed, setPreviewFailed] = useState(false)
   const [errors, setErrors] = useState({})
   const [submitError, setSubmitError] = useState('')
@@ -57,7 +65,8 @@ export default function ProductFormPage() {
           image_url: p.image_url ?? '',
         })
         setNutritionValues(nutritionToInputs(p.nutrition))
-        setNutritionSource(p.nutrition?.source ?? 'manual')
+        setOriginal(p)
+        setEditingNutrition(p.nutrition?.source === 'manual')
         setStatus('ready')
       })
       .catch((err) => {
@@ -74,14 +83,19 @@ export default function ProductFormPage() {
 
   function updateNutrition(field, value) {
     setNutritionValues((v) => ({ ...v, [field]: value }))
-    setNutritionSource('manual')
     const key = `nutrition.${field}`
     if (errors[key]) setErrors((e) => ({ ...e, [key]: undefined }))
   }
 
+  function restoreAiNutrition() {
+    setEditingNutrition(false)
+    setNutritionValues(nutritionToInputs(original?.nutrition?.source === 'ai' ? original.nutrition : null))
+    setErrors((e) => Object.fromEntries(Object.entries(e).filter(([key]) => !key.startsWith('nutrition.'))))
+  }
+
   async function handleSubmit(event) {
     event.preventDefault()
-    const { errors: found, nutrition } = validate(values, nutritionValues, nutritionSource)
+    const { errors: found, nutrition } = validate(values, nutritionValues, editingNutrition)
     setErrors(found)
     setSubmitError('')
     if (Object.keys(found).length > 0) return
@@ -92,7 +106,7 @@ export default function ProductFormPage() {
       price: parsePrice(values.price),
       category: values.category,
       image_url: values.image_url.trim() || null,
-      nutrition,
+      ...(editingNutrition && { nutrition }),
     }
 
     setSubmitting(true)
@@ -116,6 +130,10 @@ export default function ProductFormPage() {
   }
 
   const errorCount = Object.values(errors).filter(Boolean).length
+  const aiState = original ? nutritionState(original) : 'new'
+  const fromAi = !editingNutrition && original?.nutrition?.source === 'ai'
+  const textChanged = original && (values.name.trim() !== original.name
+    || values.description.trim() !== (original.description ?? ''))
   const title = isEdit ? 'Editar produto' : 'Novo produto'
 
   return (
@@ -229,34 +247,84 @@ export default function ProductFormPage() {
               )
           )}
 
-          <fieldset className="form-section">
-            <legend>
-              Tabela nutricional <span className="optional">(opcional)</span>
-            </legend>
-            <p className="form-note">
-              Valores médios por porção. Preencha todos os campos ou deixe todos vazios.
-              {nutritionSource === 'ai' && ' Valores atuais estimados por IA; revise antes de salvar.'}
-            </p>
-            <div className="nutrition-grid">
-              {NUTRITION_FIELDS.map((f) => (
-                <Field
-                  key={f.key}
-                  label={`${f.label} (${f.unit})`}
-                  id={`nutrition-${f.key}`}
-                  error={errors[`nutrition.${f.key}`]}
-                >
-                  <input
+          <section className="form-section nutrition-form" aria-labelledby="nutrition-title">
+            <header className="nutrition-form-head">
+              <h2 id="nutrition-title">Informação nutricional da porção</h2>
+              {fromAi && <AiBadge />}
+            </header>
+
+            {(editingNutrition || fromAi) && (
+              <div className="nutrition-grid">
+                {NUTRITION_FIELDS.map((f) => (
+                  <Field
+                    key={f.key}
+                    label={MACRO_CLASS[f.key]
+                      ? <><i className={`macro-dot ${MACRO_CLASS[f.key]}`} aria-hidden="true" /> {f.label}</>
+                      : f.label}
                     id={`nutrition-${f.key}`}
-                    inputMode="decimal"
-                    placeholder="0"
-                    value={nutritionValues[f.key]}
-                    aria-invalid={!!errors[`nutrition.${f.key}`]}
-                    onChange={(e) => updateNutrition(f.key, e.target.value.replace(/[^\d.,]/g, ''))}
-                  />
-                </Field>
-              ))}
+                    error={errors[`nutrition.${f.key}`]}
+                  >
+                    <div className={`input-group ${errors[`nutrition.${f.key}`] ? 'is-invalid' : ''} ${fromAi ? 'is-readonly' : ''}`}>
+                      <input
+                        id={`nutrition-${f.key}`}
+                        inputMode="decimal"
+                        placeholder="0"
+                        readOnly={fromAi}
+                        value={nutritionValues[f.key]}
+                        aria-invalid={!!errors[`nutrition.${f.key}`]}
+                        onChange={(e) => updateNutrition(f.key, e.target.value.replace(/[^\d.,]/g, ''))}
+                      />
+                      {f.key === 'serving_size' ? (
+                        <select
+                          className="input-suffix-select"
+                          aria-label="Unidade da porção"
+                          disabled={fromAi}
+                          value={nutritionValues.serving_unit}
+                          onChange={(e) => updateNutrition('serving_unit', e.target.value)}
+                        >
+                          {SERVING_UNITS.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
+                        </select>
+                      ) : <span className="input-suffix">{f.unit}</span>}
+                    </div>
+                  </Field>
+                ))}
+              </div>
+            )}
+
+            {!editingNutrition && !fromAi && (
+              <p className="nutrition-form-state">
+                {aiState === 'pending'
+                  ? <span className="kcal-chip kcal-chip-pending"><Sparkles size={12} aria-hidden="true" />Calculando…</span>
+                  : <Sparkles size={16} aria-hidden="true" />}
+                {aiState === 'new' && 'A IA estima a tabela automaticamente alguns segundos depois do cadastro.'}
+                {aiState === 'pending' && 'A IA está estimando a tabela deste produto.'}
+                {aiState === 'unavailable' && 'A IA não conseguiu estimar a tabela. Preencha manualmente ou use “Tentar de novo” na lista de produtos.'}
+              </p>
+            )}
+
+            <div className="nutrition-form-foot">
+              <p className="form-note">
+                {editingNutrition
+                  ? 'Valores informados pela equipe: a IA não os sobrescreve. Deixe todos vazios para a IA calcular.'
+                  : fromAi
+                    ? textChanged
+                      ? 'O nome ou a descrição mudaram: ao salvar, a IA estima a tabela de novo.'
+                      : 'Valores médios estimados pela IA no cadastro. Somente leitura enquanto vierem da IA.'
+                    : 'Valores médios por porção.'}
+              </p>
+              {editingNutrition ? (
+                original?.nutrition?.source !== 'manual' && (
+                  <Button variant="outline" onClick={restoreAiNutrition}>
+                    <Sparkles size={16} aria-hidden="true" /> Usar estimativa da IA
+                  </Button>
+                )
+              ) : (
+                <Button variant="outline" onClick={() => setEditingNutrition(true)}>
+                  <Pencil size={16} aria-hidden="true" /> {fromAi ? 'Editar valores' : 'Preencher manualmente'}
+                </Button>
+              )}
             </div>
-          </fieldset>
+          </section>
 
           <p className="form-note"><span className="required">*</span> Campos obrigatórios</p>
 
