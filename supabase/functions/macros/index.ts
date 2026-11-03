@@ -4,7 +4,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2.45.4'
 import { estimateNutrition } from './estimate.ts'
 import { decide, type ProductRow, type WebhookPayload, validateNutrition } from './rules.ts'
 
-const PRODUCT_COLUMNS = 'id, name, description, category, calories_kcal, nutrition_source'
+const PRODUCT_COLUMNS = 'id, name, description, category, nutrition_source, nutrition_status'
 
 // Background tasks do Supabase: mantém a função viva após a resposta.
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void }
@@ -47,17 +47,24 @@ async function fillNutrition(productId: number): Promise<void> {
   const { data: product, error: readError } = await supabase
     .from('products').select(PRODUCT_COLUMNS).eq('id', productId).maybeSingle<ProductRow>()
   if (readError) throw readError
-  if (!product || product.nutrition_source === 'manual') return
+  if (!product || product.nutrition_source === 'manual' || product.nutrition_status !== 'pending') return
 
-  const result = validateNutrition(await estimateNutrition(product))
-  if ('error' in result) throw new Error(`resposta da IA inválida: ${result.error}`)
+  // Só grava se o produto ainda espera a estimativa: não sobrescreve uma
+  // edição manual feita enquanto a IA respondia.
+  const writeIfPending = async (fields: Record<string, unknown>) => {
+    const { error } = await supabase.from('products').update(fields)
+      .eq('id', product.id).eq('nutrition_status', 'pending').is('nutrition_source', null)
+    if (error) throw error
+  }
 
-  // O filtro de origem impede sobrescrever uma edição manual feita enquanto a IA respondia.
-  const { error: writeError } = await supabase
-    .from('products')
-    .update({ ...result.nutrition, nutrition_source: 'ai' })
-    .eq('id', product.id)
-    .or('nutrition_source.is.null,nutrition_source.eq.ai')
-  if (writeError) throw writeError
-  console.log(`macros: produto ${product.id} atualizado`, result.nutrition)
+  try {
+    const result = validateNutrition(await estimateNutrition(product))
+    if ('error' in result) throw new Error(`resposta da IA inválida: ${result.error}`)
+    await writeIfPending({ ...result.nutrition, nutrition_source: 'ai', nutrition_status: 'ready' })
+    console.log(`macros: produto ${product.id} atualizado`, result.nutrition)
+  } catch (err) {
+    console.error(`macros: falha ao estimar o produto ${product.id}`, err)
+    // "failed" aparece como "Indisponível" e libera o botão "Tentar de novo" no admin.
+    await writeIfPending({ nutrition_status: 'failed' })
+  }
 }

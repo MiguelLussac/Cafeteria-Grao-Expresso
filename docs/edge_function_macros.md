@@ -1,22 +1,31 @@
 # Edge Function `macros`: tabela nutricional automática
 
-Quando um produto é cadastrado ou tem nome/descrição alterados, o Supabase chama a Edge Function `macros`, que estima a tabela nutricional média com o Gemini e grava nas colunas de `products` com `nutrition_source = 'ai'`. A API Flask não participa: o produto é salvo na hora e os macros aparecem alguns segundos depois.
+Quando um produto é cadastrado ou tem nome/descrição alterados, o Supabase chama a Edge Function `macros`, que estima a tabela nutricional média da porção com o Gemini (em `ml` para líquidos e `g` para o resto) e grava nas colunas de `products` com `nutrition_source = 'ai'`. O produto é salvo na hora e a tabela aparece alguns segundos depois; o cardápio e o admin se atualizam sozinhos enquanto houver produto "Calculando…".
 
 ```
-Flask grava em products ──► Database Webhook (INSERT/UPDATE)
-                                     │
-                                     ▼
-                      Edge Function macros ──► Gemini
-                                     │
-              UPDATE products SET serving_size_g, ..., nutrition_source = 'ai'
+Flask grava em products (nutrition_status = 'pending') ──► Database Webhook (INSERT/UPDATE)
+                                                                    │
+                                                                    ▼
+                                                     Edge Function macros ──► Gemini
+                                                                    │
+                       UPDATE products SET serving_size, serving_unit, ..., nutrition_status = 'ready' | 'failed'
 ```
+
+## Status da tabela (`nutrition_status`)
+
+| Status | Significado | Quem define | Na tela |
+|---|---|---|---|
+| `pending` | Aguardando a IA | API: cadastro sem tabela, mudança de nome/descrição de produto com tabela da IA, "Tentar de novo" | "Calculando…" (vira "Indisponível" após 2 min sem resposta) |
+| `ready` | Tabela preenchida | Edge Function (IA) ou API (tabela manual) | kcal, porção e macros |
+| `failed` | A IA não conseguiu estimar | Edge Function | "Indisponível" + botão "Tentar de novo" no admin |
+
+`ready` sempre tem tabela e `pending`/`failed` nunca têm: o banco garante isso por `CHECK constraint`. Ao mudar o nome ou a descrição, a estimativa antiga é descartada para não mostrar valores de outro produto.
 
 ## Regras
 
-- **Tabela manual nunca é sobrescrita.** Se `nutrition_source = 'manual'`, a função não faz nada.
-- **Sem loop.** A gravação da própria função não muda nome nem descrição, então o webhook seguinte é ignorado. Mudanças só de preço ou categoria também não chamam a IA.
-- **Produto sem tabela tenta de novo** em qualquer edição (por exemplo, se a IA falhou da primeira vez).
-- **Validação em duas camadas:** a função confere a resposta da IA (`rules.ts`) e o banco recusa valores inválidos pelas `CHECK constraints` da migração `a3c51e7d9b20`.
+- **A IA só age em `pending`.** As gravações da própria função mudam o status para `ready` ou `failed`, então o webhook seguinte é ignorado (sem loop). Mudar só o preço ou a categoria não chama a IA.
+- **Tabela manual nunca é sobrescrita.** Se `nutrition_source = 'manual'`, a função não faz nada; no admin, "Editar valores" torna a tabela manual e esvaziar todos os campos devolve o cálculo para a IA.
+- **Validação em duas camadas:** a função confere a resposta da IA (`rules.ts`) e o banco recusa valores inválidos pelas `CHECK constraints` (migrações `a3c51e7d9b20` e `c7e2f4a91d36`).
 
 ## Arquivos
 

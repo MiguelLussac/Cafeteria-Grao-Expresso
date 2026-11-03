@@ -1,7 +1,12 @@
 from datetime import datetime
 from app.extensions import db
 
-NUTRITION_COLUMNS = ("serving_size_g", "calories_kcal", "protein_g", "carbs_g", "fat_g", "nutrition_source")
+NUTRITION_COLUMNS = (
+    "serving_size", "serving_unit", "calories_kcal", "protein_g", "carbs_g", "fat_g", "nutrition_source",
+)
+SERVING_UNITS = ("g", "ml")
+# pending: aguardando a IA; ready: tabela preenchida; failed: a IA não conseguiu estimar.
+NUTRITION_STATUSES = ("pending", "ready", "failed")
 
 # Regras da tabela nutricional garantidas pelo próprio banco, já que a Edge
 # Function do Supabase grava esses campos sem passar pela API Flask.
@@ -11,13 +16,19 @@ NUTRITION_CHECKS = {
         + " AND ".join(f"{c} IS NOT NULL" for c in NUTRITION_COLUMNS) + ")"
     ),
     "ck_products_nutrition_range": (
-        "serving_size_g IS NULL OR ("
-        "serving_size_g > 0 AND serving_size_g <= 5000"
+        "serving_size IS NULL OR ("
+        "serving_size > 0 AND serving_size <= 5000"
         " AND calories_kcal >= 0 AND calories_kcal <= 10000"
         " AND protein_g >= 0 AND carbs_g >= 0 AND fat_g >= 0"
-        " AND protein_g + carbs_g + fat_g <= serving_size_g)"
+        " AND protein_g + carbs_g + fat_g <= serving_size)"
     ),
     "ck_products_nutrition_source": "nutrition_source IS NULL OR nutrition_source IN ('manual', 'ai')",
+    "ck_products_serving_unit": "serving_unit IS NULL OR serving_unit IN ('g', 'ml')",
+    # "ready" sempre com tabela; "pending"/"failed" sempre sem tabela.
+    "ck_products_nutrition_status": (
+        "(nutrition_status = 'ready' AND calories_kcal IS NOT NULL)"
+        " OR (nutrition_status IN ('pending', 'failed') AND calories_kcal IS NULL)"
+    ),
 }
 
 
@@ -36,12 +47,15 @@ class Product(db.Model):
 
     # Tabela nutricional média por porção. Todos os campos ficam vazios ou
     # todos preenchidos; nutrition_source indica a origem: "manual" ou "ai".
-    serving_size_g = db.Column(db.Numeric(7, 1), nullable=True)
+    # A porção é em gramas ou, para bebidas e outros líquidos, em mililitros.
+    serving_size = db.Column(db.Numeric(7, 1), nullable=True)
+    serving_unit = db.Column(db.String(2), nullable=True)
     calories_kcal = db.Column(db.Numeric(7, 1), nullable=True)
     protein_g = db.Column(db.Numeric(7, 1), nullable=True)
     carbs_g = db.Column(db.Numeric(7, 1), nullable=True)
     fat_g = db.Column(db.Numeric(7, 1), nullable=True)
     nutrition_source = db.Column(db.String(10), nullable=True)
+    nutrition_status = db.Column(db.String(10), nullable=False, default="pending", server_default="pending")
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
@@ -50,7 +64,8 @@ class Product(db.Model):
         if self.calories_kcal is None:
             return None
         return {
-            "serving_size_g": float(self.serving_size_g),
+            "serving_size": float(self.serving_size),
+            "serving_unit": self.serving_unit,
             "calories_kcal": float(self.calories_kcal),
             "protein_g": float(self.protein_g),
             "carbs_g": float(self.carbs_g),
@@ -68,6 +83,7 @@ class Product(db.Model):
             "is_active": self.is_active,
             "image_url": self.image_url,
             "nutrition": self.nutrition_dict(),
+            "nutrition_status": self.nutrition_status,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None
         }
