@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { listProducts } from '../services/api'
 import { CATEGORIES } from '../utils/format'
+import { nutritionState } from '../utils/nutrition'
 import { Alert, Button, EmptyState, Loading } from '../components/ui'
+import { AiBadge } from '../components/Nutrition'
 import ProductCard from '../components/ProductCard'
 import ProductSelection from '../components/ProductSelection'
 
@@ -9,18 +11,41 @@ function itemsLabel(n) {
   return `${n} ${n === 1 ? 'item' : 'itens'}`
 }
 
+// Enquanto a IA calcula a tabela de algum produto, o cardápio se atualiza sozinho.
+const POLL_MS = 5000
+
+const SORTS = [
+  { value: 'padrao', label: 'Padrão do cardápio' },
+  { value: 'kcal-asc', label: 'Menos calorias' },
+  { value: 'kcal-desc', label: 'Mais calorias' },
+]
+
+// Produtos sem tabela ficam sempre no fim, nas duas ordens por calorias.
+function sortProducts(products, sort) {
+  if (sort === 'padrao') return products
+  const direction = sort === 'kcal-asc' ? 1 : -1
+  return [...products].sort((a, b) => {
+    const ka = a.nutrition?.calories_kcal
+    const kb = b.nutrition?.calories_kcal
+    if (ka == null || kb == null) return (ka == null) - (kb == null)
+    return (ka - kb) * direction
+  })
+}
+
 export default function MenuPage() {
   const [products, setProducts] = useState([])
   const [status, setStatus] = useState('loading') // loading | ready | error
   const [error, setError] = useState('')
   const [filter, setFilter] = useState('todos')
+  const [sort, setSort] = useState('padrao')
 
-  const load = useCallback(async () => {
-    setStatus('loading')
+  const load = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setStatus('loading')
     try {
       setProducts((await listProducts()).filter((product) => product.is_active))
       setStatus('ready')
     } catch (err) {
+      if (silent) return
       setError(err.message)
       setStatus('error')
     }
@@ -30,9 +55,16 @@ export default function MenuPage() {
     load()
   }, [load])
 
+  const calculating = products.some((p) => nutritionState(p) === 'pending')
+  useEffect(() => {
+    if (!calculating) return undefined
+    const timer = setInterval(() => load({ silent: true }), POLL_MS)
+    return () => clearInterval(timer)
+  }, [calculating, load])
+
   const groups = CATEGORIES.map((cat) => ({
     ...cat,
-    items: products.filter((p) => p.category === cat.value),
+    items: sortProducts(products.filter((p) => p.category === cat.value), sort),
   }))
   const visibleGroups = groups.filter(
     (g) => g.items.length > 0 && (filter === 'todos' || filter === g.value),
@@ -47,8 +79,19 @@ export default function MenuPage() {
       <header className="page-header">
         <div>
           <h1>Cardápio</h1>
-          <p className="page-subtitle">Cafés, doces e salgados preparados todos os dias.</p>
+          <p className="page-subtitle menu-header-note">
+            Cafés, doces e salgados preparados todos os dias.
+            <AiBadge label="Calorias estimadas por IA" withInfo />
+          </p>
         </div>
+        {status === 'ready' && products.length > 0 && (
+          <label className="menu-sort">
+            Ordenar
+            <select className="select" value={sort} onChange={(e) => setSort(e.target.value)}>
+              {SORTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+            </select>
+          </label>
+        )}
       </header>
 
       <ProductSelection />

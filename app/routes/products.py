@@ -1,20 +1,88 @@
 import math
-from decimal import Decimal, InvalidOperation
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from functools import wraps
+from urllib.parse import urlparse
 
 from flask import Blueprint, current_app, request, jsonify
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.extensions import db
-from app.models.product import Product
+from app.models.product import NUTRITION_COLUMNS, SERVING_UNITS, Product
 from app.utils.auth_decorator import role_required
 
 products_bp = Blueprint("products", __name__)
 
 VALID_CATEGORIES = ("bebidas", "doces", "salgados")
-PRODUCT_FIELDS = {"name", "description", "price", "category"}
+PRODUCT_FIELDS = {"name", "description", "price", "category", "image_url", "nutrition"}
 MAX_PRICE = Decimal("99999999.99")
 CENT = Decimal("0.01")
+MAX_IMAGE_URL_LENGTH = 500
+
+# Campo da tabela nutricional -> valor máximo aceito (por porção).
+NUTRITION_LIMITS = {
+    "serving_size": Decimal("5000"),
+    "calories_kcal": Decimal("10000"),
+    "protein_g": Decimal("5000"),
+    "carbs_g": Decimal("5000"),
+    "fat_g": Decimal("5000"),
+}
+NUTRITION_SOURCES = ("manual", "ai")
+TENTH = Decimal("0.1")
+
+
+def _validate_image_url(value):
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return None, None
+    if not isinstance(value, str):
+        return None, "O campo 'image_url' deve ser um texto."
+    value = value.strip()
+    if len(value) > MAX_IMAGE_URL_LENGTH:
+        return None, f"O campo 'image_url' deve ter no máximo {MAX_IMAGE_URL_LENGTH} caracteres."
+    parsed = urlparse(value)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        return None, "O campo 'image_url' deve ser um endereço http(s) válido."
+    return value, None
+
+
+def _validate_nutrition(value):
+    """Retorna as colunas da tabela nutricional; None limpa todos os campos."""
+    if value is None:
+        return {field: None for field in (*NUTRITION_LIMITS, "serving_unit", "nutrition_source")}, None
+    if not isinstance(value, dict):
+        return None, "O campo 'nutrition' deve ser um objeto ou null."
+
+    unknown = set(value) - set(NUTRITION_LIMITS) - {"serving_unit", "source"}
+    if unknown:
+        return None, f"Campos não permitidos em 'nutrition': {', '.join(sorted(unknown))}."
+    missing = [field for field in NUTRITION_LIMITS if field not in value]
+    if missing:
+        return None, f"Informe todos os campos da tabela nutricional: {', '.join(missing)}."
+
+    columns = {}
+    for field, limit in NUTRITION_LIMITS.items():
+        number = value[field]
+        if isinstance(number, bool) or not isinstance(number, (int, float)) or not math.isfinite(number):
+            return None, f"O campo 'nutrition.{field}' deve ser numérico."
+        number = Decimal(str(number)).quantize(TENTH, rounding=ROUND_HALF_UP)
+        if number < 0 or number > limit:
+            return None, f"O campo 'nutrition.{field}' deve estar entre 0 e {limit}."
+        columns[field] = number
+
+    if columns["serving_size"] <= 0:
+        return None, "O campo 'nutrition.serving_size' deve ser maior que zero."
+    if columns["protein_g"] + columns["carbs_g"] + columns["fat_g"] > columns["serving_size"]:
+        return None, "A soma de proteínas, carboidratos e gorduras não pode passar do tamanho da porção."
+
+    source = value.get("source", "manual")
+    if source not in NUTRITION_SOURCES:
+        return None, f"O campo 'nutrition.source' deve ser um destes: {', '.join(NUTRITION_SOURCES)}."
+    columns["nutrition_source"] = source
+
+    unit = value.get("serving_unit", "g")
+    if unit not in SERVING_UNITS:
+        return None, f"O campo 'nutrition.serving_unit' deve ser um destes: {', '.join(SERVING_UNITS)}."
+    columns["serving_unit"] = unit
+    return columns, None
 
 
 def _validate_product_data(data, *, partial=False):
@@ -71,10 +139,35 @@ def _validate_product_data(data, *, partial=False):
             return None, "O campo 'description' deve ser um texto."
         validated["description"] = description.strip() if description else ""
 
+    if "image_url" in data:
+        image_url, error = _validate_image_url(data["image_url"])
+        if error:
+            return None, error
+        validated["image_url"] = image_url
+
+    if "nutrition" in data:
+        nutrition, error = _validate_nutrition(data["nutrition"])
+        if error:
+            return None, error
+        validated.update(nutrition)
+
     if "is_active" in data:
         return None, "Campos não permitidos: is_active."
 
     return validated, None
+
+
+def _clear_nutrition(product):
+    for column in NUTRITION_COLUMNS:
+        setattr(product, column, None)
+
+
+def _not_found():
+    return jsonify({
+        "success": False,
+        "error": "Produto não encontrado.",
+        "status_code": 404
+    }), 404
 
 
 def _validation_error(message):
@@ -194,13 +287,10 @@ def create_product():
     if error:
         return _validation_error(error)
 
-    product = Product(
-        name=product_data["name"],
-        description=product_data.get("description", ""),
-        price=product_data["price"],
-        category=product_data["category"],
-        is_active=True
-    )
+    product_data.setdefault("description", "")
+    product = Product(**product_data, is_active=True)
+    # Sem tabela informada, a Edge Function "macros" estima com IA após o cadastro.
+    product.nutrition_status = "ready" if product.calories_kcal is not None else "pending"
     try:
         db.session.add(product)
         db.session.commit()
@@ -235,8 +325,20 @@ def update_product(product_id):
     if error:
         return _validation_error(error)
 
+    text_changed = any(
+        field in product_data and (product_data[field] or "") != (getattr(product, field) or "")
+        for field in ("name", "description")
+    )
     for field, value in product_data.items():
         setattr(product, field, value)
+
+    if "calories_kcal" in product_data:
+        # Tabela enviada pela equipe; null devolve o cálculo para a IA.
+        product.nutrition_status = "ready" if product.calories_kcal is not None else "pending"
+    elif text_changed and product.nutrition_source != "manual":
+        # A estimativa anterior descrevia outro produto: descarta e pede uma nova à IA.
+        _clear_nutrition(product)
+        product.nutrition_status = "pending"
 
     try:
         db.session.commit()
@@ -247,6 +349,33 @@ def update_product(product_id):
         "message": "Produto atualizado com sucesso.",
         "data": product.to_dict()
     }), 200
+
+
+@products_bp.route("/products/<int:product_id>/nutrition/retry", methods=["POST"])
+@_require_product_role("admin", "atendente")
+def retry_product_nutrition(product_id):
+    """Pede uma nova estimativa à IA para um produto cuja tabela falhou."""
+    product = db.session.get(Product, product_id)
+    if not product:
+        return _not_found()
+    if product.nutrition_status != "failed":
+        return jsonify({
+            "success": False,
+            "error": "Só é possível tentar de novo quando a estimativa falhou.",
+            "status_code": 409
+        }), 409
+
+    # A mudança de status é um UPDATE em products, que dispara o webhook da IA.
+    product.nutrition_status = "pending"
+    try:
+        db.session.commit()
+    except SQLAlchemyError:
+        return _database_error("Não foi possível solicitar uma nova estimativa.")
+    return jsonify({
+        "success": True,
+        "message": "Nova estimativa solicitada.",
+        "data": product.to_dict()
+    }), 202
 
 
 @products_bp.route("/products/<int:product_id>", methods=["DELETE"])

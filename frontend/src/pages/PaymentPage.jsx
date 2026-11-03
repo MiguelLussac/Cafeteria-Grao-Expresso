@@ -1,50 +1,74 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Banknote, CheckCircle2, CreditCard, QrCode } from 'lucide-react'
+import { Check } from 'lucide-react'
 import { getOrder, registerSimulatedPayment } from '../services/api'
 import { Alert, Button, EmptyState, Loading } from '../components/ui'
+import { NutritionLine, NutritionSummary } from '../components/Nutrition'
 import { PAYMENT_METHODS, formatPrice, paymentMethodLabel } from '../utils/format'
 
-const METHOD_ICONS = { dinheiro: Banknote, cartao: CreditCard, pix: QrCode }
+const METHOD_HINTS = { dinheiro: 'no caixa', cartao: 'débito ou crédito', pix: 'QR Code' }
 
 function isPaid(order) {
   return order?.payment?.status === 'pago'
 }
 
-function OrderSummary({ order }) {
+// Itens do pedido no formato do resumo nutricional (a API envia a tabela de cada produto).
+function nutritionItems(order) {
+  return (order.items ?? []).map((item) => ({
+    name: item.product_name ?? `Produto ${item.product_id}`,
+    quantity: item.quantity,
+    nutrition: item.nutrition ?? null,
+  }))
+}
+
+function itemsCount(order) {
+  return (order.items ?? []).reduce((total, item) => total + item.quantity, 0)
+}
+
+function orderMeta(order) {
+  return [order.customer_name, order.table_number, order.notes && `“${order.notes}”`].filter(Boolean).join(' · ')
+}
+
+function OrderItems({ order }) {
   return (
-    <div className="payment-summary">
+    <section className="card payment-order" aria-labelledby="payment-order-title">
+      <header>
+        <h2 id="payment-order-title">Seu pedido</h2>
+        <span>{orderMeta(order)}</span>
+      </header>
       <ul className="payment-items">
         {(order.items ?? []).map((item) => (
           <li key={item.id}>
-            <span>
-              {item.quantity}× {item.product_name ?? `Produto ${item.product_id}`}
-            </span>
-            <span>{formatPrice(item.subtotal)}</span>
+            <span className="payment-qty">{item.quantity}×</span>
+            <span>{item.product_name ?? `Produto ${item.product_id}`}</span>
+            <strong>{formatPrice(item.subtotal)}</strong>
           </li>
         ))}
       </ul>
-      <div className="payment-total">
-        <span>Total a pagar</span>
-        <strong>{formatPrice(order.total_amount)}</strong>
-      </div>
-    </div>
+    </section>
   )
 }
 
 function Confirmation({ order }) {
+  const subtitle = [paymentMethodLabel(order.payment.method), formatPrice(order.payment.amount), order.table_number]
+    .filter(Boolean).join(' · ')
   return (
-    <div className="card payment-confirmation" role="status">
-      <CheckCircle2 className="payment-confirmation-icon" size={56} aria-hidden="true" />
-      <h1>Pagamento confirmado!</h1>
-      <p className="page-subtitle">
-        {formatPrice(order.payment.amount)} · {paymentMethodLabel(order.payment.method)}
-      </p>
-      <div className="order-number">
-        <span>Número do seu pedido</span>
-        <strong>{order.id}</strong>
+    <div className="payment-confirmation" role="status">
+      <span className="payment-confirmation-icon"><Check size={36} aria-hidden="true" /></span>
+      <h1>Pagamento confirmado</h1>
+      <p className="page-subtitle">{subtitle}</p>
+      <div className="card payment-confirmation-card">
+        <div className="order-number">
+          <span>Pedido</span>
+          <strong>{String(order.id).padStart(3, '0')}</strong>
+        </div>
+        <span className="status status-received">Recebido</span>
+        <NutritionLine items={nutritionItems(order)} />
       </div>
-      <p>Aguarde: seu pedido está sendo preparado. Acompanhe na TV do balcão o status do seu pedido!</p>
+      <p>
+        Acompanhe na TV do balcão: avisaremos quando estiver pronto
+        {order.customer_name ? `, ${order.customer_name}` : ''}.
+      </p>
       <Link to="/" className="btn btn-outline">
         Voltar ao cardápio
       </Link>
@@ -152,23 +176,27 @@ export default function PaymentPage() {
     )
   }
 
+  const count = itemsCount(order)
   return (
-    <div className="container page page-narrow">
+    <div className="container page">
       <header className="page-header">
         <div>
           <h1>Pagamento</h1>
-          <p className="page-subtitle">Pedido #{order.id} · pagamento simulado, nenhum valor é cobrado.</p>
+          <p className="page-subtitle">Pedido #{order.id}</p>
         </div>
       </header>
 
-      <form className="card form" onSubmit={handleSubmit} noValidate>
-        <OrderSummary order={order} />
+      <form className="checkout" onSubmit={handleSubmit} noValidate>
+        <div className="checkout-main">
+          <OrderItems order={order} />
+          {/* Resumo antes do preço: o cliente vê o que vai consumir antes de pagar. */}
+          <NutritionSummary items={nutritionItems(order)} collapsible />
+        </div>
 
-        <fieldset className="payment-methods" disabled={submitting}>
-          <legend>Forma de pagamento</legend>
-          {PAYMENT_METHODS.map((m) => {
-            const Icon = METHOD_ICONS[m.value]
-            return (
+        <aside className="checkout-side">
+          <fieldset className="card payment-methods" disabled={submitting}>
+            <legend>Forma de pagamento</legend>
+            {PAYMENT_METHODS.map((m) => (
               <label key={m.value} className={`payment-method ${method === m.value ? 'is-selected' : ''}`}>
                 <input
                   type="radio"
@@ -177,22 +205,33 @@ export default function PaymentPage() {
                   checked={method === m.value}
                   onChange={() => setMethod(m.value)}
                 />
-                <Icon size={28} aria-hidden="true" />
-                {m.label}
+                <span className="payment-method-label">{m.label}</span>
+                <span className="payment-method-hint">{METHOD_HINTS[m.value]}</span>
               </label>
-            )
-          })}
-        </fieldset>
+            ))}
+          </fieldset>
 
-        {error && (
-          <Alert variant="error" title={error.title} onClose={() => setError(null)}>
-            {error.text}
-          </Alert>
-        )}
+          {error && (
+            <Alert variant="error" title={error.title} onClose={() => setError(null)}>
+              {error.text}
+            </Alert>
+          )}
 
-        <Button type="submit" block disabled={submitting}>
-          {submitting ? 'Processando pagamento...' : `Confirmar pagamento de ${formatPrice(order.total_amount)}`}
-        </Button>
+          <div className="card checkout-total">
+            <div className="payment-subtotal">
+              <span>Subtotal · {count} {count === 1 ? 'item' : 'itens'}</span>
+              <span>{formatPrice(order.total_amount)}</span>
+            </div>
+            <div className="payment-total">
+              <span>Total</span>
+              <strong>{formatPrice(order.total_amount)}</strong>
+            </div>
+            <Button type="submit" block disabled={submitting}>
+              {submitting ? 'Processando pagamento...' : `Confirmar e pagar ${formatPrice(order.total_amount)}`}
+            </Button>
+            <p className="form-note">Pagamento simulado · projeto acadêmico</p>
+          </div>
+        </aside>
       </form>
     </div>
   )
