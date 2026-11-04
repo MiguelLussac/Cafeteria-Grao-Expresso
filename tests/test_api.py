@@ -1,7 +1,11 @@
 import json
-import pytest
+import logging
 from datetime import datetime, timedelta, timezone
+
 import jwt
+import pytest
+
+from app import _redact_sensitive_data, create_app
 
 
 @pytest.mark.parametrize("authorization", [None, "Basic invalid", "Bearer invalid"])
@@ -45,6 +49,36 @@ def test_health_check(client):
     assert data["status"] == "healthy"
     assert "version" in data
 
+def test_logger_configurado_e_redacao_de_dados_sensiveis():
+    app = create_app("testing")
+    assert app.logger.level == logging.INFO
+    assert any(isinstance(handler, logging.StreamHandler) for handler in app.logger.handlers)
+
+    payload = {
+        "password": "segredo",
+        "token": "jwt-valor",
+        "nested": {"cpf": "12345678900", "safe": "ok"},
+    }
+    sanitized = _redact_sensitive_data(payload)
+    assert sanitized["password"] == "[REDACTED]"
+    assert sanitized["token"] == "[REDACTED]"
+    assert sanitized["nested"]["cpf"] == "[REDACTED]"
+    assert sanitized["nested"]["safe"] == "ok"
+
+
+def test_log_warning_de_erro_controlado_sem_expor_dados_sensiveis(capsys):
+    app = create_app("testing")
+    with app.test_client() as client:
+        response = client.post("/api/v1/orders/999/payment", json={"method": "pix"})
+
+    captured = capsys.readouterr()
+    assert response.status_code == 404
+    assert "Pagamento rejeitado" in captured.err
+    assert "jwt" not in captured.err.lower()
+    assert "token" not in captured.err.lower()
+    assert "password" not in captured.err.lower()
+
+
 def test_auth_login_success(client):
     """Testa login com sucesso do usuário padrão 'atendente'."""
     payload = {
@@ -58,6 +92,7 @@ def test_auth_login_success(client):
     assert "token" in data["data"]
     assert data["data"]["user"]["role"] == "atendente"
 
+
 def test_auth_login_invalid(client):
     """Testa login com credenciais incorretas."""
     payload = {
@@ -68,6 +103,7 @@ def test_auth_login_invalid(client):
     assert response.status_code == 401
     data = response.get_json()
     assert data["success"] is False
+
 
 def test_list_products(client):
     """Testa listagem de produtos com categorias."""

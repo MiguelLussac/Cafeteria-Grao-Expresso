@@ -1,5 +1,5 @@
 from decimal import Decimal
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, current_app, jsonify, request
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import selectinload
 
@@ -35,10 +35,12 @@ def create_order():
     """Criação de um novo pedido (usado pelo Totem ou pelo Atendente)."""
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
+        current_app.logger.warning("Pedido rejeitado: corpo JSON inválido ou ausente.")
         return _erro("Envie um JSON com a lista 'items'.")
 
     items_data = data.get("items")
     if not items_data or not isinstance(items_data, list):
+        current_app.logger.warning("Pedido rejeitado: payload sem lista de itens válida.")
         return _erro("O pedido deve conter ao menos um item na lista 'items'.")
 
     customer_name, err = _texto_opcional(data, "customer_name", "Balcão")
@@ -55,6 +57,7 @@ def create_order():
     total = Decimal("0.00")
     for item_input in items_data:
         if not isinstance(item_input, dict):
+            current_app.logger.warning("Pedido rejeitado: item da lista com formato inválido.")
             return _erro("Cada item deve ser um objeto com 'product_id' e 'quantity'.")
 
         product_id = item_input.get("product_id")
@@ -62,10 +65,12 @@ def create_order():
 
         if (isinstance(product_id, bool) or not isinstance(product_id, int) or product_id <= 0
                 or isinstance(quantity, bool) or not isinstance(quantity, int) or quantity <= 0):
+            current_app.logger.warning("Pedido rejeitado: produto/quantidade inválidos no payload.")
             return _erro("Cada item deve possuir 'product_id' e 'quantity' inteiros e maiores que 0.")
 
         product = Product.query.get(product_id)
         if not product or not product.is_active:
+            current_app.logger.warning("Pedido rejeitado: produto_id=%s não encontrado ou inativo.", product_id)
             return _erro(f"Produto com ID {product_id} não encontrado ou inativo.")
 
         unit_price = Decimal(str(product.price)).quantize(Decimal("0.01"))
@@ -93,6 +98,7 @@ def create_order():
         db.session.commit()
     except SQLAlchemyError:
         db.session.rollback()
+        current_app.logger.exception("Falha ao persistir pedido no banco.")
         return _erro("Não foi possível registrar o pedido. Nada foi salvo.", 500)
 
     order_dict = order.to_dict()
@@ -107,7 +113,14 @@ def create_order():
             "items_count": len(order.items)
         }))
     except Exception:
-        pass
+        current_app.logger.warning("Pedido %s foi criado, mas a publicação SSE falhou.", order.id)
+
+    current_app.logger.info(
+        "Pedido criado com sucesso. order_id=%s status=%s total=%.2f",
+        order.id,
+        order.status,
+        float(order.total_amount),
+    )
 
     return jsonify({
         "success": True,
@@ -187,6 +200,7 @@ def update_order_status(order_id):
     """Atualizar o status do pedido (usado pela cozinha/barista)."""
     order = Order.query.get(order_id)
     if not order:
+        current_app.logger.warning("Tentativa de atualização de status para pedido inexistente. order_id=%s", order_id)
         return jsonify({
             "success": False,
             "error": "Pedido não encontrado.",
@@ -195,6 +209,7 @@ def update_order_status(order_id):
 
     data = request.get_json(silent=True) or {}
     if not isinstance(data, dict):
+        current_app.logger.warning("Atualização de status recusada: payload inválido para order_id=%s", order_id)
         return jsonify({
             "success": False,
             "error": "Status inválido. Opções válidas: " + ", ".join(OrderStatus.ALL),
@@ -202,6 +217,7 @@ def update_order_status(order_id):
         }), 400
     value = data.get("status")
     if not isinstance(value, str):
+        current_app.logger.warning("Atualização de status recusada: status ausente ou inválido para order_id=%s", order_id)
         return jsonify({
             "success": False,
             "error": "Status inválido. Opções válidas: " + ", ".join(OrderStatus.ALL),
@@ -210,6 +226,7 @@ def update_order_status(order_id):
     new_status = value.strip().lower()
 
     if new_status not in OrderStatus.ALL:
+        current_app.logger.warning("Atualização de status recusada: status '%s' inválido para order_id=%s", new_status, order_id)
         return jsonify({
             "success": False,
             "error": f"Status inválido. Opções válidas: {', '.join(OrderStatus.ALL)}",
@@ -217,12 +234,23 @@ def update_order_status(order_id):
         }), 400
 
     if new_status not in OrderStatus.TRANSITIONS.get(order.status, set()):
+        current_app.logger.warning(
+            "Transição de status proibida. order_id=%s status_atual=%s tentativa=%s",
+            order_id,
+            order.status,
+            new_status,
+        )
         return jsonify({"success": False, "error": "Transição de status não permitida.",
                         "status_code": 409}), 409
 
     if new_status != OrderStatus.CANCELADO and (
         not order.payment or order.payment.status != PaymentStatus.PAGO
     ):
+        current_app.logger.warning(
+            "Alteração de status bloqueada: pedido ainda não pago. order_id=%s status=%s",
+            order_id,
+            order.status,
+        )
         return jsonify({"success": False, "error": "Pedido ainda não foi pago/liberado.",
                         "status_code": 409}), 409
 
@@ -233,11 +261,18 @@ def update_order_status(order_id):
         )
         if not changed:
             db.session.rollback()
+            current_app.logger.warning(
+                "Conflito ao atualizar status: order_id=%s status_anterior=%s tentativa=%s",
+                order_id,
+                previous_status,
+                new_status,
+            )
             return jsonify({"success": False, "error": "Pedido atualizado por outra requisição.",
                             "status_code": 409}), 409
         db.session.commit()
     except SQLAlchemyError:
         db.session.rollback()
+        current_app.logger.exception("Falha ao atualizar status do pedido no banco. order_id=%s", order_id)
         return jsonify({"success": False, "error": "Falha ao atualizar pedido.",
                         "status_code": 500}), 500
 
@@ -251,6 +286,13 @@ def update_order_status(order_id):
 
     if new_status == OrderStatus.PRONTO:
         sse_broker.publish("order_ready", event_data)
+
+    current_app.logger.info(
+        "Status do pedido atualizado. order_id=%s de=%s para=%s",
+        order.id,
+        previous_status,
+        new_status,
+    )
 
     return jsonify({
         "success": True,
