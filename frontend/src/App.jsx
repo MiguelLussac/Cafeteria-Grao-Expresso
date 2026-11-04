@@ -11,6 +11,7 @@ import KitchenPage from './pages/KitchenPage'
 import NotFoundPage from './pages/NotFoundPage'
 import { OrderProvider } from './context/OrderContext'
 import OrderSummaryPage from './pages/OrderSummaryPage'
+import { TotemLayout, TotemHome } from './pages/TotemPage'
 import OrderDisplayPage from './pages/OrderDisplayPage'
 
 function Protected({ children }) {
@@ -24,6 +25,12 @@ export default function App() {
         <BrowserRouter>
           <Routes>
             <Route path="monitor" element={<OrderDisplayPage />} />
+            <Route path="totem" element={<TotemLayout />}>
+              <Route index element={<TotemHome />} />
+              <Route path="cardapio" element={<MenuPage totem />} />
+              <Route path="pedido/resumo" element={<OrderSummaryPage totem />} />
+              <Route path="pedido/:id/pagamento" element={<PaymentPage totem />} />
+            </Route>
             <Route element={<Layout />}>
               <Route index element={<MenuPage />} />
               <Route path="pedido/resumo" element={<OrderSummaryPage />} />

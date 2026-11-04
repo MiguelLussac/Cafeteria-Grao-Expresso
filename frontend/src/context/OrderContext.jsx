@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react'
+import { createContext, useCallback, useContext, useState } from 'react'
 import { createOrder } from '../services/api'
 import { addProduct, changeQuantity, createOrderSubmitter, removeProduct } from '../utils/order'
 
@@ -25,13 +25,13 @@ export function OrderProvider({ children }) {
     if (!locked) setItems((current) => removeProduct(current, id))
   }
 
-  function startNewOrder() {
+  const startNewOrder = useCallback(() => {
     if (isSubmitting) return
     setItems([])
     setDetails({ customer_name: '', table_number: '', notes: '' })
     setCreatedOrder(null)
     setSubmit(() => createOrderSubmitter(createOrder))
-  }
+  }, [isSubmitting])
 
   async function confirmOrder() {
     setIsSubmitting(true)
