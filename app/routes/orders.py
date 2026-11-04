@@ -116,10 +116,9 @@ def create_order():
         current_app.logger.warning("Pedido %s foi criado, mas a publicação SSE falhou.", order.id)
 
     current_app.logger.info(
-        "Pedido criado com sucesso. order_id=%s status=%s total=%.2f",
+        "Pedido criado com sucesso. order_id=%s status=%s",
         order.id,
         order.status,
-        float(order.total_amount),
     )
 
     return jsonify({
@@ -226,7 +225,7 @@ def update_order_status(order_id):
     new_status = value.strip().lower()
 
     if new_status not in OrderStatus.ALL:
-        current_app.logger.warning("Atualização de status recusada: status '%s' inválido para order_id=%s", new_status, order_id)
+        current_app.logger.warning("Atualização de status recusada: status inválido para order_id=%s", order_id)
         return jsonify({
             "success": False,
             "error": f"Status inválido. Opções válidas: {', '.join(OrderStatus.ALL)}",

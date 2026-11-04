@@ -18,7 +18,7 @@ class Config:
     SQLALCHEMY_DATABASE_URI = database_url
     # O pooler do Supabase encerra conexões ociosas; o pre_ping evita erro
     # ao reutilizar uma conexão que já foi fechada do outro lado.
-    SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True}
+    SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True, "hide_parameters": True}
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     JSON_SORT_KEYS = False
 
