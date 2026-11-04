@@ -43,8 +43,8 @@ do mesmo estado tenham sucesso. Nenhum evento é emitido antes do commit.
 | Evento | Momento / conteúdo |
 |---|---|
 | connected | Toda conexão: resync_required=true e state_url=/api/v1/orders/kitchen |
-| new_order | Pagamento persistido: order_id e pedido completo, incluindo itens e pagamento |
-| order_status_updated | Mudança persistida: order_id, customer_name, table_number, status, updated_at |
+| new_order | Pagamento persistido: order_id e status |
+| order_status_updated | Mudança persistida: order_id, status, updated_at |
 | order_ready | Mesmo conteúdo de status, ao chegar a pronto |
 
 O servidor envia `retry: 3000` e comentários `: heartbeat` após 15s ociosos.

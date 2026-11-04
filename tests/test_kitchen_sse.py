@@ -151,6 +151,7 @@ def test_transition_matrix(client, headers, listener, current, target):
         assert name == 'order_status_updated'
         assert data['order_id'] == order_id and data['status'] == target
         assert data['updated_at']
+        assert set(data) == {'order_id', 'status', 'updated_at'}
         if target == 'pronto':
             assert event(listener) == ('order_ready', data)
     assert listener.empty()
@@ -184,16 +185,11 @@ def test_invalid_payment_never_releases_order(client, headers, listener, amount)
     assert client.get(f'/api/v1/orders/{order_id}/payment').status_code == 404
 
 
-def test_release_only_after_payment_once_with_full_payload(client, listener):
+def test_release_only_after_payment_once_with_public_payload(client, listener):
     order_id = create(client)
     assert listener.empty()
-    payment = pay(client, order_id)
-    name, data = event(listener)
-    assert name == 'new_order'
-    assert data['order_id'] == data['id'] == order_id
-    assert data['items'][0]['quantity'] == 2
-    assert data['notes'] == 'Sem açúcar'
-    assert data['payment'] == payment
+    pay(client, order_id)
+    assert event(listener) == ('new_order', {'order_id': order_id, 'status': 'recebido'})
     assert client.post(f'/api/v1/orders/{order_id}/payment', json={'method': 'pix'}).status_code == 400
     assert listener.empty()
 
@@ -251,9 +247,15 @@ def test_stream_disconnect_reconnect_and_api_recovery(client, headers):
     recovered = client.get(metadata['state_url'], headers=headers).get_json()['data']
     assert [row['id'] for row in recovered] == [order_id]
     assert recovered[0]['status'] == 'em_preparo'
+    display_url = '/api/v1/orders/display'
+    assert client.get(display_url).get_json()['data'] == [{'id': order_id, 'status': 'em_preparo'}]
     assert advance(client, headers, order_id, 'pronto').status_code == 200
     assert 'event: order_status_updated' in next(stream.response).decode()
     assert 'event: order_ready' in next(stream.response).decode()
+    assert client.get(display_url).get_json()['data'] == [{'id': order_id, 'status': 'pronto'}]
+    assert advance(client, headers, order_id, 'entregue').status_code == 200
+    assert 'event: order_status_updated' in next(stream.response).decode()
+    assert client.get(display_url).get_json()['data'] == []
     stream.close()
     assert len(sse_broker._listeners) == before
 

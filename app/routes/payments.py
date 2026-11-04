@@ -86,7 +86,7 @@ def register_simulated_payment(order_id):
         return jsonify({"success": False, "error": "Falha ao registrar pagamento.",
                         "status_code": 500}), 500
 
-    sse_broker.publish("new_order", {"order_id": order.id, **order.to_dict()})
+    sse_broker.publish("new_order", {"order_id": order.id, "status": order.status})
 
     return jsonify({
         "success": True,
