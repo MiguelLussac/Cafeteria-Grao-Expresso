@@ -22,6 +22,16 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     JSON_SORT_KEYS = False
 
+    # Fotos dos produtos no Supabase Storage. Sem URL e chave, o upload fica
+    # desativado e só o campo de URL da imagem funciona.
+    SUPABASE_URL = (os.getenv("SUPABASE_URL") or "").rstrip("/") or None
+    # Chave secreta (service role): acesso total ao projeto, só no servidor.
+    SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or None
+    SUPABASE_STORAGE_BUCKET = os.getenv("SUPABASE_STORAGE_BUCKET", "produtos")
+    # Fotos chegam reduzidas pelo navegador; o bucket aceita até 2 MB.
+    MAX_IMAGE_BYTES = 2 * 1024 * 1024
+    MAX_CONTENT_LENGTH = 3 * 1024 * 1024
+
 
 class DevelopmentConfig(Config):
     """Configurações para desenvolvimento local."""
@@ -35,6 +45,9 @@ class TestingConfig(Config):
     SECRET_KEY = os.getenv("SECRET_KEY") or "test-secret-not-for-production"
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY") or "test-jwt-secret-not-for-production"
     SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+    # Testes nunca enviam arquivos ao Storage real (ver tests com monkeypatch).
+    SUPABASE_URL = None
+    SUPABASE_SERVICE_ROLE_KEY = None
 
 
 class ProductionConfig(Config):

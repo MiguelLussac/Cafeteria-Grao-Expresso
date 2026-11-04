@@ -43,6 +43,14 @@ def register_error_handlers(app):
             "status_code": 405
         }), 405
 
+    @app.errorhandler(413)
+    def payload_too_large(error):
+        return jsonify({
+            "success": False,
+            "error": "Arquivo grande demais. Envie uma foto de até 2 MB.",
+            "status_code": 413
+        }), 413
+
     @app.errorhandler(500)
     def internal_server_error(error):
         return jsonify({

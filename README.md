@@ -107,6 +107,12 @@ flask --app run db migrate -m "descrição da mudança"
 ```
 Revise o arquivo gerado em `migrations/versions/` antes do commit.
 
+#### Fotos dos produtos (Supabase Storage)
+As fotos enviadas pelo formulário de produto vão para o bucket público `produtos` do Supabase Storage, sempre através da API (o navegador nunca recebe a chave do Storage). O navegador reduz a foto para até 1200 px antes do envio; a API aceita JPEG, PNG ou WebP de até 2 MB e apaga do bucket a foto anterior ao trocar ou remover.
+
+- Endpoints: `POST /api/v1/products/<id>/image` (multipart, campo `image`) e `DELETE /api/v1/products/<id>/image`, para admin e atendente.
+- Configure `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` no `.env` (local) e no painel do Render. Sem elas, o upload responde 503 e só o campo de URL da imagem funciona.
+
 ### Cadastrar e consultar um produto
 
 Por padrão, a aplicação usa SQLite local. Em outro terminal, faça login com um usuário padrão (por exemplo, `atendente` / `atendente123`) e copie o valor de `data.token` da resposta:
