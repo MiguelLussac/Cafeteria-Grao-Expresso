@@ -27,6 +27,11 @@ services:
       # a string do Session pooler do Supabase (ver .env.example).
       - key: DATABASE_URL
         sync: false
+      # Upload das fotos dos produtos (Supabase Storage). Valores só no painel.
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
 
   - type: web
     name: grao-expresso-front

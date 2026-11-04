@@ -60,7 +60,9 @@ export function clearSession() {
 
 async function request(path, { method = 'GET', body, auth = false } = {}) {
   const headers = {}
-  if (body !== undefined) headers['Content-Type'] = 'application/json'
+  // FormData (upload de arquivo): o navegador define o Content-Type com o boundary.
+  const isForm = body instanceof FormData
+  if (body !== undefined && !isForm) headers['Content-Type'] = 'application/json'
 
   if (auth) {
     const token = getToken()
@@ -72,7 +74,7 @@ async function request(path, { method = 'GET', body, auth = false } = {}) {
     response = await fetch(`${BASE_URL}${path}`, {
       method,
       headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: body === undefined || isForm ? body : JSON.stringify(body),
     })
   } catch {
     throw new ApiError('Não foi possível conectar ao servidor. Tente novamente.', 0)
@@ -135,6 +137,19 @@ export async function createProduct(product) {
 // changes: qualquer subconjunto de { name, price, category, description, is_active }
 export async function updateProduct(id, changes) {
   const res = await request(`/products/${id}`, { method: 'PUT', body: changes, auth: true })
+  return res.data
+}
+
+// Envia a foto do produto para o Supabase Storage (via API). image: Blob/File.
+export async function uploadProductImage(id, image, filename = 'foto.webp') {
+  const form = new FormData()
+  form.append('image', image, filename)
+  const res = await request(`/products/${id}/image`, { method: 'POST', body: form, auth: true })
+  return res.data
+}
+
+export async function deleteProductImage(id) {
+  const res = await request(`/products/${id}/image`, { method: 'DELETE', auth: true })
   return res.data
 }
 

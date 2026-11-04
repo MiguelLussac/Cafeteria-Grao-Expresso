@@ -1,4 +1,5 @@
 import math
+import uuid
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from functools import wraps
 from urllib.parse import urlparse
@@ -8,6 +9,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.extensions import db
 from app.models.product import NUTRITION_COLUMNS, SERVING_UNITS, Product
+from app.services import storage_service
 from app.utils.auth_decorator import role_required
 
 products_bp = Blueprint("products", __name__)
@@ -155,6 +157,25 @@ def _validate_product_data(data, *, partial=False):
         return None, "Campos não permitidos: is_active."
 
     return validated, None
+
+
+# Tipo real da foto pelos primeiros bytes (o Content-Type do navegador não é confiável).
+def _detect_image_type(content):
+    if content.startswith(b"\xff\xd8\xff"):
+        return "jpg", "image/jpeg"
+    if content.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "png", "image/png"
+    if content[:4] == b"RIFF" and content[8:12] == b"WEBP":
+        return "webp", "image/webp"
+    return None
+
+
+def _json_error(message, status_code):
+    return jsonify({
+        "success": False,
+        "error": message,
+        "status_code": status_code
+    }), status_code
 
 
 def _clear_nutrition(product):
@@ -329,6 +350,7 @@ def update_product(product_id):
         field in product_data and (product_data[field] or "") != (getattr(product, field) or "")
         for field in ("name", "description")
     )
+    previous_image = product.image_url
     for field, value in product_data.items():
         setattr(product, field, value)
 
@@ -344,9 +366,80 @@ def update_product(product_id):
         db.session.commit()
     except SQLAlchemyError:
         return _database_error("Não foi possível atualizar o produto.")
+    if product.image_url != previous_image:
+        storage_service.delete_quietly(previous_image)
     return jsonify({
         "success": True,
         "message": "Produto atualizado com sucesso.",
+        "data": product.to_dict()
+    }), 200
+
+
+@products_bp.route("/products/<int:product_id>/image", methods=["POST"])
+@_require_product_role("admin", "atendente")
+def upload_product_image(product_id):
+    """Envia a foto do produto para o Supabase Storage (campo multipart "image")."""
+    product = db.session.get(Product, product_id)
+    if not product:
+        return _not_found()
+    if not storage_service.is_configured():
+        return _json_error(
+            "Upload de fotos não configurado neste servidor. Use o campo de URL da imagem.", 503
+        )
+
+    file = request.files.get("image")
+    if file is None or not file.filename:
+        return _validation_error("Envie a foto no campo 'image'.")
+    content = file.read(current_app.config["MAX_IMAGE_BYTES"] + 1)
+    if len(content) > current_app.config["MAX_IMAGE_BYTES"]:
+        return _json_error("A foto deve ter no máximo 2 MB.", 413)
+    detected = _detect_image_type(content)
+    if not detected:
+        return _validation_error("Formato não suportado. Envie JPEG, PNG ou WebP.")
+    extension, content_type = detected
+
+    path = f"products/{product.id}/{uuid.uuid4().hex}.{extension}"
+    try:
+        url = storage_service.upload(path, content, content_type)
+    except storage_service.StorageError:
+        current_app.logger.exception("Falha ao enviar foto do produto %s.", product.id)
+        return _json_error("Não foi possível enviar a foto. Tente novamente.", 502)
+
+    previous_image = product.image_url
+    product.image_url = url
+    try:
+        db.session.commit()
+    except SQLAlchemyError:
+        storage_service.delete_quietly(url)
+        return _database_error("Não foi possível salvar a foto do produto.")
+    storage_service.delete_quietly(previous_image)
+
+    return jsonify({
+        "success": True,
+        "message": "Foto enviada com sucesso.",
+        "data": product.to_dict()
+    }), 200
+
+
+@products_bp.route("/products/<int:product_id>/image", methods=["DELETE"])
+@_require_product_role("admin", "atendente")
+def delete_product_image(product_id):
+    """Remove a foto do produto (e o arquivo do Storage, se estiver no bucket)."""
+    product = db.session.get(Product, product_id)
+    if not product:
+        return _not_found()
+
+    previous_image = product.image_url
+    product.image_url = None
+    try:
+        db.session.commit()
+    except SQLAlchemyError:
+        return _database_error("Não foi possível remover a foto do produto.")
+    storage_service.delete_quietly(previous_image)
+
+    return jsonify({
+        "success": True,
+        "message": "Foto removida.",
         "data": product.to_dict()
     }), 200
 

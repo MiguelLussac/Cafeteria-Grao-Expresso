@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ChevronRight, Pencil, Sparkles } from 'lucide-react'
-import { createProduct, getProduct, updateProduct } from '../services/api'
+import { ChevronRight, ImageIcon, Pencil, Sparkles, Trash2, Upload } from 'lucide-react'
+import { createProduct, getProduct, updateProduct, uploadProductImage } from '../services/api'
+import { prepareImage } from '../utils/image'
 import { CATEGORIES, parsePrice, priceToInput } from '../utils/format'
 import { EMPTY_NUTRITION, MACROS, NUTRITION_FIELDS, SERVING_UNITS, isValidImageUrl, nutritionState,
   nutritionToInputs, parseNutritionInputs } from '../utils/nutrition'
@@ -48,6 +49,14 @@ export default function ProductFormPage() {
   // Valores da IA ficam somente leitura até a equipe escolher editar.
   const [editingNutrition, setEditingNutrition] = useState(false)
   const [previewFailed, setPreviewFailed] = useState(false)
+  // Foto escolhida no computador: { blob, filename, previewUrl }; enviada ao salvar.
+  const [photo, setPhoto] = useState(null)
+  const [preparingPhoto, setPreparingPhoto] = useState(false)
+  const [photoError, setPhotoError] = useState('')
+  const fileInput = useRef(null)
+
+  // Libera a pré-visualização local ao trocar de foto ou sair da página.
+  useEffect(() => () => photo && URL.revokeObjectURL(photo.previewUrl), [photo])
   const [errors, setErrors] = useState({})
   const [submitError, setSubmitError] = useState('')
   const [status, setStatus] = useState(isEdit ? 'loading' : 'ready')
@@ -78,7 +87,33 @@ export default function ProductFormPage() {
   function update(field, value) {
     setValues((v) => ({ ...v, [field]: value }))
     if (errors[field]) setErrors((e) => ({ ...e, [field]: undefined }))
-    if (field === 'image_url') setPreviewFailed(false)
+    if (field === 'image_url') {
+      setPreviewFailed(false)
+      setPhoto(null)
+    }
+  }
+
+  async function choosePhoto(event) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    setPhotoError('')
+    setPreparingPhoto(true)
+    try {
+      const { blob, filename } = await prepareImage(file)
+      setPhoto({ blob, filename, previewUrl: URL.createObjectURL(blob) })
+      setPreviewFailed(false)
+    } catch (err) {
+      setPhotoError(err.message)
+    } finally {
+      setPreparingPhoto(false)
+    }
+  }
+
+  function removePhoto() {
+    setPhoto(null)
+    setPhotoError('')
+    update('image_url', '')
   }
 
   function updateNutrition(field, value) {
@@ -105,24 +140,33 @@ export default function ProductFormPage() {
       description: values.description.trim(),
       price: parsePrice(values.price),
       category: values.category,
-      image_url: values.image_url.trim() || null,
+      // Com foto nova, a URL vem do upload feito logo depois de salvar.
+      ...(!photo && { image_url: values.image_url.trim() || null }),
       ...(editingNutrition && { nutrition }),
     }
 
     setSubmitting(true)
     try {
       const saved = isEdit ? await updateProduct(id, payload) : await createProduct(payload)
-      navigate('/admin', {
-        state: {
-          flash: {
-            variant: 'success',
-            title: isEdit ? 'Produto salvo.' : 'Produto cadastrado.',
-            text: isEdit
-              ? `“${saved.name}” foi atualizado.`
-              : `“${saved.name}” já aparece no cardápio.`,
-          },
-        },
-      })
+      let flash = {
+        variant: 'success',
+        title: isEdit ? 'Produto salvo.' : 'Produto cadastrado.',
+        text: isEdit
+          ? `“${saved.name}” foi atualizado.`
+          : `“${saved.name}” já aparece no cardápio.`,
+      }
+      if (photo) {
+        try {
+          await uploadProductImage(saved.id, photo.blob, photo.filename)
+        } catch (err) {
+          flash = {
+            variant: 'error',
+            title: isEdit ? 'Produto salvo, mas a foto não foi enviada.' : 'Produto cadastrado, mas a foto não foi enviada.',
+            text: `${err.message} Edite o produto para tentar de novo.`,
+          }
+        }
+      }
+      navigate('/admin', { state: { flash } })
     } catch (err) {
       setSubmitError(err.message)
       setSubmitting(false)
@@ -135,6 +179,10 @@ export default function ProductFormPage() {
   const textChanged = original && (values.name.trim() !== original.name
     || values.description.trim() !== (original.description ?? ''))
   const title = isEdit ? 'Editar produto' : 'Novo produto'
+  const linkPreview = values.image_url.trim() && isValidImageUrl(values.image_url) && !previewFailed
+    ? values.image_url.trim()
+    : null
+  const previewSrc = photo?.previewUrl ?? linkPreview
 
   return (
     <div className="container page page-narrow">
@@ -217,35 +265,67 @@ export default function ProductFormPage() {
             </Field>
           </div>
 
-          <Field
-            label="URL da imagem"
-            id="image_url"
-            optional
-            error={errors.image_url}
-            hint="Link direto para uma foto (.jpg, .png ou .webp)."
-          >
-            <input
-              id="image_url"
-              type="url"
-              inputMode="url"
-              placeholder="https://..."
-              value={values.image_url}
-              aria-invalid={!!errors.image_url}
-              onChange={(e) => update('image_url', e.target.value)}
-            />
-          </Field>
-          {values.image_url.trim() && isValidImageUrl(values.image_url) && (
-            previewFailed
-              ? <p className="form-note">Não foi possível carregar a imagem deste endereço.</p>
-              : (
-                <img
-                  className="image-preview"
-                  src={values.image_url.trim()}
-                  alt="Pré-visualização da imagem do produto"
-                  onError={() => setPreviewFailed(true)}
+          <section className="form-section photo-field" aria-labelledby="photo-title">
+            <h2 id="photo-title">Foto do produto <span className="optional">(opcional)</span></h2>
+            <div className="photo-picker">
+              <div className={`photo-preview product-media product-media-${values.category || 'bebidas'}`}>
+                {previewSrc
+                  ? <img src={previewSrc} alt="Pré-visualização da foto do produto" onError={() => setPreviewFailed(true)} />
+                  : <ImageIcon size={32} aria-hidden="true" className="product-media-placeholder" />}
+              </div>
+              <div className="photo-actions">
+                <div className="photo-buttons">
+                  <input
+                    ref={fileInput}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="visually-hidden"
+                    tabIndex={-1}
+                    aria-hidden="true"
+                    onChange={choosePhoto}
+                  />
+                  <Button variant="outline" disabled={preparingPhoto} onClick={() => fileInput.current?.click()}>
+                    <Upload size={16} aria-hidden="true" />
+                    {preparingPhoto ? 'Preparando foto…' : previewSrc ? 'Trocar foto' : 'Escolher foto'}
+                  </Button>
+                  {previewSrc && (
+                    <Button variant="outline-danger" onClick={removePhoto}>
+                      <Trash2 size={16} aria-hidden="true" /> Remover
+                    </Button>
+                  )}
+                </div>
+                <p className="form-note">
+                  {photo
+                    ? 'Foto pronta: será enviada ao salvar.'
+                    : 'JPEG, PNG ou WebP. A foto é reduzida para até 1200 px antes do envio.'}
+                </p>
+                {previewFailed && values.image_url.trim() && (
+                  <p className="form-note">Não foi possível carregar a imagem deste endereço.</p>
+                )}
+                {photoError && <p className="field-error" role="alert">{photoError}</p>}
+              </div>
+            </div>
+
+            <details className="photo-url" open={Boolean(errors.image_url)}>
+              <summary>Usar um link de imagem</summary>
+              <Field
+                label="URL da imagem"
+                id="image_url"
+                error={errors.image_url}
+                hint="Link direto para uma foto (.jpg, .png ou .webp)."
+              >
+                <input
+                  id="image_url"
+                  type="url"
+                  inputMode="url"
+                  placeholder="https://..."
+                  value={photo ? '' : values.image_url}
+                  aria-invalid={!!errors.image_url}
+                  onChange={(e) => update('image_url', e.target.value)}
                 />
-              )
-          )}
+              </Field>
+            </details>
+          </section>
 
           <section className="form-section nutrition-form" aria-labelledby="nutrition-title">
             <header className="nutrition-form-head">
