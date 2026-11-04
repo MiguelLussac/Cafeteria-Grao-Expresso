@@ -50,4 +50,4 @@ services:
       # URL pública da API. Se o Render atribuir outro endereço ao serviço
       # grao-expresso-api, atualize aqui e faça um novo deploy do frontend.
       - key: VITE_API_URL
-        value: https://grao-expresso-api.onrender.com
+        value: https://cafeteria-grao-expresso.onrender.com
