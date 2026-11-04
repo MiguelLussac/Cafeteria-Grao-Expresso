@@ -11,6 +11,7 @@ import KitchenPage from './pages/KitchenPage'
 import NotFoundPage from './pages/NotFoundPage'
 import { OrderProvider } from './context/OrderContext'
 import OrderSummaryPage from './pages/OrderSummaryPage'
+import OrderDisplayPage from './pages/OrderDisplayPage'
 
 function Protected({ children }) {
   return <ProtectedRoute>{children}</ProtectedRoute>
@@ -22,6 +23,7 @@ export default function App() {
       <OrderProvider>
         <BrowserRouter>
           <Routes>
+            <Route path="monitor" element={<OrderDisplayPage />} />
             <Route element={<Layout />}>
               <Route index element={<MenuPage />} />
               <Route path="pedido/resumo" element={<OrderSummaryPage />} />

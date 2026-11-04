@@ -172,6 +172,14 @@ export async function getOrder(id) {
   return res.data
 }
 
+export async function listDisplayOrders() {
+  const res = await request('/orders/display')
+  if (!Array.isArray(res?.data)) {
+    throw new ApiError('A API retornou uma fila inválida.')
+  }
+  return res.data
+}
+
 // payment: { method: 'dinheiro' | 'cartao' | 'pix', amount? }
 // Sem amount, o Flask usa o total do pedido. Não processa dinheiro real.
 export async function registerSimulatedPayment(id, payment) {
