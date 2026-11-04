@@ -1,3 +1,4 @@
+import logging
 import os
 import secrets
 import sys
@@ -23,6 +24,70 @@ MIGRATIONS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__
 # Revisão que corresponde ao schema criado pelo antigo db.create_all().
 BASELINE_REVISION = "1f88bbface9a"
 
+SENSITIVE_KEYS = {
+    "password",
+    "passwd",
+    "pwd",
+    "secret",
+    "token",
+    "jwt",
+    "authorization",
+    "api_key",
+    "api-key",
+    "card_number",
+    "cardnumber",
+    "cvv",
+    "cpf",
+    "cnpj",
+    "email",
+    "telefone",
+    "payment",
+    "pagamento",
+}
+
+
+def _redact_sensitive_data(value):
+    """Remove ou mascarar chaves que podem expor dados pessoais ou sensíveis."""
+    if isinstance(value, dict):
+        sanitized = {}
+        for key, item in value.items():
+            key_text = str(key).lower()
+            if any(sensitive in key_text for sensitive in SENSITIVE_KEYS):
+                sanitized[key] = "[REDACTED]"
+            else:
+                sanitized[key] = _redact_sensitive_data(item)
+        return sanitized
+    if isinstance(value, list):
+        return [_redact_sensitive_data(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_redact_sensitive_data(item) for item in value)
+    return value
+
+
+def _configure_logging(app):
+    """Configura logging do Flask em stdout para hospedagens como Render/Gunicorn."""
+    app.logger.handlers.clear()
+    app.logger.setLevel(logging.INFO)
+    app.logger.propagate = False
+
+    formatter = logging.Formatter(
+        "%(asctime)s %(levelname)s %(name)s %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(formatter)
+    stream_handler.setLevel(logging.INFO)
+    app.logger.addHandler(stream_handler)
+
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+    if not root_logger.handlers:
+        root_handler = logging.StreamHandler()
+        root_handler.setFormatter(formatter)
+        root_logger.addHandler(root_handler)
+
+    app.logger.info("Logging do Flask configurado para stdout.")
+
 
 def create_app(config_name=None):
     """Cria e configura a aplicação Flask."""
@@ -37,6 +102,7 @@ def create_app(config_name=None):
 
     app = Flask(__name__)
     app.config.from_object(config_by_name.get(config_name, config_by_name["default"]))
+    _configure_logging(app)
 
     weak_examples = {
         "sua-chave-secreta-forte-aqui",
