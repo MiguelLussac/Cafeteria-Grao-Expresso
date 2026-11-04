@@ -1,5 +1,6 @@
 import json
 import logging
+import sys
 from datetime import datetime, timedelta, timezone
 
 import jwt
@@ -161,3 +162,27 @@ def test_create_and_update_order_flow(client):
     status_resp_pronto = client.patch(f"/api/v1/orders/{order_id}/status", json={"status": "pronto"}, headers=headers)
     assert status_resp_pronto.status_code == 200
     assert status_resp_pronto.get_json()["data"]["status"] == "pronto"
+
+
+def test_logs_omit_untrusted_payment_and_status_values(app, client, capsys, monkeypatch):
+    monkeypatch.setattr(app.logger.handlers[0], "stream", sys.stderr)
+    created = client.post("/api/v1/orders", json={"items": [{"product_id": 1, "quantity": 1}]})
+    assert created.status_code == 201
+    order_id = created.get_json()["data"]["id"]
+    url = f"/api/v1/orders/{order_id}"
+    login = client.post("/api/v1/auth/login", json={"username": "barista", "password": "barista123"})
+    headers = {"Authorization": f"Bearer {login.get_json()['data']['token']}"}
+    cases = [
+        ("post", "/payment", {"method": "private-method-example"}, "método inválido", "private-method-example"),
+        ("post", "/payment", {"method": "pix", "amount": "private-amount-example"}, "valor inválido", "private-amount-example"),
+        ("post", "/payment", {"method": "pix", "amount": "987654321.12"}, "valor incompatível", "987654321.12"),
+        ("patch", "/status", {"status": "private-status-example"}, "status inválido", "private-status-example"),
+    ]
+    for method, path, payload, reason, private_value in cases:
+        capsys.readouterr()
+        response = client.open(url + path, method=method.upper(), json=payload, headers=headers)
+        assert response.status_code == 400
+        log = capsys.readouterr().err
+        assert "WARNING" in log and reason in log
+        assert f"order_id={order_id}" in log
+        assert private_value not in log

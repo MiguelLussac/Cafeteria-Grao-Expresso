@@ -65,7 +65,7 @@ def _redact_sensitive_data(value):
 
 
 def _configure_logging(app):
-    """Configura logging do Flask em stdout para hospedagens como Render/Gunicorn."""
+    """Configura logging do Flask em stderr para hospedagens como Render/Gunicorn."""
     app.logger.handlers.clear()
     app.logger.setLevel(logging.INFO)
     app.logger.propagate = False
@@ -86,7 +86,7 @@ def _configure_logging(app):
         root_handler.setFormatter(formatter)
         root_logger.addHandler(root_handler)
 
-    app.logger.info("Logging do Flask configurado para stdout.")
+    app.logger.info("Logging do Flask configurado para stderr.")
 
 
 def create_app(config_name=None):
