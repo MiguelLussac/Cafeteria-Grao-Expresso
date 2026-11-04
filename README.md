@@ -191,7 +191,7 @@ O arquivo `render.yaml` (Blueprint) cria os dois serviços de uma vez:
 
 | Serviço | Tipo | Endereço esperado |
 |---|---|---|
-| `grao-expresso-api` | Web Service (Python + gunicorn) | `https://grao-expresso-api.onrender.com` |
+| `grao-expresso-api` | Web Service (Python + gunicorn) | `https://cafeteria-grao-expresso.onrender.com` |
 | `grao-expresso-front` | Static Site (React) | `https://grao-expresso-front.onrender.com` |
 
 **Passo a passo**
