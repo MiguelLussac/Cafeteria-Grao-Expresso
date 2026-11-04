@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Check, Clock, Coffee, ShoppingBag } from 'lucide-react'
 import { Alert, Button, Loading } from '../components/ui'
-import { listDisplayOrders } from '../services/api'
+import { listDisplayOrders, subscribeOrderEvents } from '../services/api'
+import { createSerialRunner } from '../utils/kitchen'
 import './order-display.css'
 
 const clockFormat = new Intl.DateTimeFormat('pt-BR', {
@@ -39,10 +40,46 @@ export default function OrderDisplayPage() {
 
   useEffect(() => {
     let active = true
-    listDisplayOrders()
-      .then((data) => { if (active) setOrders(data) })
-      .catch((err) => { if (active) setError(err.message) })
-    return () => { active = false }
+    let unsubscribe
+    let retryTimer
+    const refresh = createSerialRunner(async () => {
+      if (!active) return
+      try {
+        const data = await listDisplayOrders()
+        if (active) {
+          setOrders(data)
+          setError('')
+        }
+      } catch (err) {
+        if (active) setError(err.message)
+      }
+    })
+
+    function connect() {
+      unsubscribe = subscribeOrderEvents({
+        onConnected: refresh,
+        onEvent: (type) => {
+          // order_ready acompanha order_status_updated na mesma transição.
+          if (type !== 'order_ready') refresh()
+        },
+        onError: (closed) => {
+          if (closed && active) {
+            unsubscribe()
+            retryTimer = setTimeout(connect, 5000)
+          }
+        },
+      })
+    }
+
+    refresh()
+    if (typeof EventSource !== 'undefined') connect()
+    const resyncTimer = setInterval(refresh, 30000)
+    return () => {
+      active = false
+      unsubscribe?.()
+      clearTimeout(retryTimer)
+      clearInterval(resyncTimer)
+    }
   }, [attempt])
 
   const preparing = orders?.filter(({ status }) => status === 'recebido' || status === 'em_preparo')

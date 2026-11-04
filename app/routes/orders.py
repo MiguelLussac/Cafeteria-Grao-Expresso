@@ -243,8 +243,6 @@ def update_order_status(order_id):
 
     event_data = {
         "order_id": order.id,
-        "customer_name": order.customer_name,
-        "table_number": order.table_number,
         "status": order.status,
         "updated_at": order.updated_at.isoformat() if order.updated_at else None
     }
