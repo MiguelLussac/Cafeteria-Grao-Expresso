@@ -16,19 +16,21 @@ function ItemKcal({ item }) {
     : <KcalPill kcal={kcal} detail="por porção" separator="" />
 }
 
-export default function OrderSummaryPage() {
+export default function OrderSummaryPage({ totem = false }) {
   const { items, details, setDetails, setQuantity, removeItem, createdOrder, isSubmitting, confirmOrder } = useOrder()
   const [error, setError] = useState('')
   const navigate = useNavigate()
+  const menuPath = totem ? '/totem/cardapio' : '/'
+  const prefix = totem ? '/totem' : ''
 
-  if (createdOrder) return <Navigate to={`/pedido/${createdOrder.id}/pagamento`} replace />
+  if (createdOrder) return <Navigate to={`${prefix}/pedido/${createdOrder.id}/pagamento`} replace />
 
   async function confirm(event) {
     event.preventDefault()
     setError('')
     try {
       const order = await confirmOrder()
-      navigate(`/pedido/${order.id}/pagamento`, { replace: true })
+      navigate(`${prefix}/pedido/${order.id}/pagamento`, { replace: true })
     } catch (err) {
       setError(err.message || 'Não foi possível registrar o pedido. Tente novamente.')
     }
@@ -42,12 +44,12 @@ export default function OrderSummaryPage() {
 
   return (
     <div className="container page">
-      <Link to="/" className="link-back"><ArrowLeft size={16} aria-hidden="true" /> Continuar escolhendo</Link>
+      <Link to={menuPath} className="link-back"><ArrowLeft size={16} aria-hidden="true" /> Continuar escolhendo</Link>
       <header className="page-header">
         <h1>Revise seu pedido</h1>
       </header>
       {!items.length ? (
-        <EmptyState title="Seu pedido está vazio." action={<Link className="btn btn-primary" to="/">Escolher produtos</Link>}>
+        <EmptyState title="Seu pedido está vazio." action={<Link className="btn btn-primary" to={menuPath}>Escolher produtos</Link>}>
           Selecione ao menos um produto no cardápio.
         </EmptyState>
       ) : (

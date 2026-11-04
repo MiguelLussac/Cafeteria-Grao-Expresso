@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Check } from 'lucide-react'
+import { useOrder } from '../context/OrderContext'
 import { getOrder, registerSimulatedPayment } from '../services/api'
 import { Alert, Button, EmptyState, Loading } from '../components/ui'
 import { NutritionLine, NutritionSummary } from '../components/Nutrition'
@@ -49,7 +50,39 @@ function OrderItems({ order }) {
   )
 }
 
-function Confirmation({ order }) {
+const TOTEM_RESET_SECONDS = 15
+
+function TotemNewOrderButton() {
+  const { startNewOrder } = useOrder()
+  const navigate = useNavigate()
+  const [seconds, setSeconds] = useState(TOTEM_RESET_SECONDS)
+
+  const returnHome = useCallback(() => {
+    startNewOrder()
+    navigate('/totem', { replace: true })
+  }, [navigate, startNewOrder])
+
+  useEffect(() => {
+    const duration = TOTEM_RESET_SECONDS * 1000
+    const deadline = Date.now() + duration
+    const interval = setInterval(() => {
+      setSeconds(Math.max(0, Math.ceil((deadline - Date.now()) / 1000)))
+    }, 1000)
+    const timeout = setTimeout(returnHome, duration)
+    return () => {
+      clearInterval(interval)
+      clearTimeout(timeout)
+    }
+  }, [returnHome])
+
+  return (
+    <Button variant="outline" onClick={returnHome}>
+      Iniciar novo pedido <span aria-hidden="true">({seconds}s)</span>
+    </Button>
+  )
+}
+
+function Confirmation({ order, totem }) {
   const subtitle = [paymentMethodLabel(order.payment.method), formatPrice(order.payment.amount), order.table_number]
     .filter(Boolean).join(' · ')
   return (
@@ -69,14 +102,14 @@ function Confirmation({ order }) {
         Acompanhe na TV do balcão: avisaremos quando estiver pronto
         {order.customer_name ? `, ${order.customer_name}` : ''}.
       </p>
-      <Link to="/" className="btn btn-outline">
-        Voltar ao cardápio
-      </Link>
+      {totem ? <TotemNewOrderButton /> : (
+        <Link to="/" className="btn btn-outline">Voltar ao cardápio</Link>
+      )}
     </div>
   )
 }
 
-export default function PaymentPage() {
+export default function PaymentPage({ totem = false }) {
   const { id } = useParams()
   const [order, setOrder] = useState(null)
   const [status, setStatus] = useState('loading') // loading | ready | error
@@ -161,7 +194,7 @@ export default function PaymentPage() {
   if (isPaid(order)) {
     return (
       <div className="container page page-narrow">
-        <Confirmation order={order} />
+        <Confirmation order={order} totem={totem} />
       </div>
     )
   }
@@ -181,12 +214,13 @@ export default function PaymentPage() {
     <div className="container page">
       <header className="page-header">
         <div>
+          {totem && <Link className="btn btn-outline" to="/totem/cardapio">← Voltar ao pedido</Link>}
           <h1>Pagamento</h1>
           <p className="page-subtitle">Pedido #{order.id}</p>
         </div>
       </header>
 
-      <form className="checkout" onSubmit={handleSubmit} noValidate>
+      <form className={totem ? "checkout totem-payment" : "checkout"} onSubmit={handleSubmit} noValidate>
         <div className="checkout-main">
           <OrderItems order={order} />
           {/* Resumo antes do preço: o cliente vê o que vai consumir antes de pagar. */}

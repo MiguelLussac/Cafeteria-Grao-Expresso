@@ -4,8 +4,9 @@ import { useOrder } from '../context/OrderContext'
 import { formatPrice } from '../utils/format'
 import { estimatedTotal, itemsQuantity } from '../utils/order'
 
-export default function ProductSelection() {
+export default function ProductSelection({ totem = false }) {
   const { items, setQuantity, removeItem, createdOrder, isSubmitting, startNewOrder } = useOrder()
+  const prefix = totem ? '/totem' : ''
   const count = itemsQuantity(items)
   const locked = isSubmitting || !!createdOrder
   return (
@@ -18,7 +19,7 @@ export default function ProductSelection() {
         <>
           <p>Pedido #{createdOrder.id} já registrado. Total definitivo: {formatPrice(createdOrder.total_amount)}.</p>
           <div className="selection-actions">
-            <Link className="btn btn-primary" to={`/pedido/${createdOrder.id}/pagamento`}>Consultar pedido</Link>
+            <Link className="btn btn-primary" to={`${prefix}/pedido/${createdOrder.id}/pagamento`}>Consultar pedido</Link>
             <Button variant="outline" onClick={startNewOrder}>Iniciar outro pedido</Button>
           </div>
         </>
@@ -46,7 +47,7 @@ export default function ProductSelection() {
           </ul>
           <div className="selection-actions">
             <strong>Total estimado: {formatPrice(estimatedTotal(items))}</strong>
-            {items.length > 0 && !isSubmitting ? <Link className="btn btn-primary" to="/pedido/resumo">Revisar pedido</Link> :
+            {items.length > 0 && !isSubmitting ? <Link className="btn btn-primary" to={`${prefix}/pedido/resumo`}>Revisar pedido</Link> :
               <Button disabled>Revisar pedido</Button>}
           </div>
         </>

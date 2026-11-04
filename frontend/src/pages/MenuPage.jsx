@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { listProducts } from '../services/api'
 import { CATEGORIES } from '../utils/format'
 import { nutritionState } from '../utils/nutrition'
@@ -11,7 +12,8 @@ function itemsLabel(n) {
   return `${n} ${n === 1 ? 'item' : 'itens'}`
 }
 
-// Enquanto a IA calcula a tabela de algum produto, o cardápio se atualiza sozinho.
+// O totem acompanha o catálogo enquanto fica aberto. O cardápio comum
+// consulta periodicamente enquanto houver uma tabela nutricional em cálculo.
 const POLL_MS = 5000
 
 const SORTS = [
@@ -32,7 +34,7 @@ function sortProducts(products, sort) {
   })
 }
 
-export default function MenuPage() {
+export default function MenuPage({ totem = false }) {
   const [products, setProducts] = useState([])
   const [status, setStatus] = useState('loading') // loading | ready | error
   const [error, setError] = useState('')
@@ -57,10 +59,10 @@ export default function MenuPage() {
 
   const calculating = products.some((p) => nutritionState(p) === 'pending')
   useEffect(() => {
-    if (!calculating) return undefined
+    if (!totem && !calculating) return undefined
     const timer = setInterval(() => load({ silent: true }), POLL_MS)
     return () => clearInterval(timer)
-  }, [calculating, load])
+  }, [totem, calculating, load])
 
   const groups = CATEGORIES.map((cat) => ({
     ...cat,
@@ -75,10 +77,11 @@ export default function MenuPage() {
   )
 
   return (
-    <div className="container page">
+    <div className={totem ? "totem-menu" : "container page"}>
       <header className="page-header">
         <div>
-          <h1>Cardápio</h1>
+          {totem && <Link className="btn btn-outline" to="/totem">← Início</Link>}
+          <h1>{totem ? 'Monte seu pedido' : 'Cardápio'}</h1>
           <p className="page-subtitle menu-header-note">
             Cafés, doces e salgados preparados todos os dias.
             <AiBadge label="Calorias estimadas por IA" withInfo />
@@ -94,58 +97,61 @@ export default function MenuPage() {
         )}
       </header>
 
-      <ProductSelection />
+      <ProductSelection totem={totem} />
 
-      {status === 'loading' && <Loading text="Carregando cardápio..." />}
+      <div className="menu-products">
 
-      {status === 'error' && (
-        <>
-          <Alert variant="error" title="Não foi possível carregar o cardápio.">{error}</Alert>
-          <Button variant="outline" onClick={load}>Tentar novamente</Button>
-        </>
-      )}
+        {status === 'loading' && <Loading text="Carregando cardápio..." />}
 
-      {status === 'ready' && products.length === 0 && (
-        <EmptyState title="O cardápio está vazio.">Nenhum produto disponível no momento.</EmptyState>
-      )}
+        {status === 'error' && (
+          <>
+            <Alert variant="error" title="Não foi possível carregar o cardápio.">{error}</Alert>
+            <Button variant="outline" onClick={load}>Tentar novamente</Button>
+          </>
+        )}
 
-      {status === 'ready' && products.length > 0 && (
-        <>
-          <div className="chips" role="tablist" aria-label="Filtrar por categoria">
-            {filters.map((f) => (
-              <button
-                key={f.value}
-                type="button"
-                role="tab"
-                aria-selected={filter === f.value}
-                className={`chip ${filter === f.value ? 'chip-active' : ''}`}
-                onClick={() => setFilter(f.value)}
-              >
-                {f.label}
-                <span className="chip-count">{f.count}</span>
-              </button>
+        {status === 'ready' && products.length === 0 && (
+          <EmptyState title="O cardápio está vazio.">Nenhum produto disponível no momento.</EmptyState>
+        )}
+
+        {status === 'ready' && products.length > 0 && (
+          <>
+            <div className="chips" role="tablist" aria-label="Filtrar por categoria">
+              {filters.map((f) => (
+                <button
+                  key={f.value}
+                  type="button"
+                  role="tab"
+                  aria-selected={filter === f.value}
+                  className={`chip ${filter === f.value ? 'chip-active' : ''}`}
+                  onClick={() => setFilter(f.value)}
+                >
+                  {f.label}
+                  <span className="chip-count">{f.count}</span>
+                </button>
+              ))}
+            </div>
+
+            {visibleGroups.length === 0 && (
+              <EmptyState>Nenhum produto nesta categoria.</EmptyState>
+            )}
+
+            {visibleGroups.map((group) => (
+              <section key={group.value} className="menu-section">
+                <h2 className="section-title">
+                  {group.label}
+                  <small>{itemsLabel(group.items.length)}</small>
+                </h2>
+                <div className="product-grid">
+                  {group.items.map((p) => (
+                    <ProductCard key={p.id} product={p} />
+                  ))}
+                </div>
+              </section>
             ))}
-          </div>
-
-          {visibleGroups.length === 0 && (
-            <EmptyState>Nenhum produto nesta categoria.</EmptyState>
-          )}
-
-          {visibleGroups.map((group) => (
-            <section key={group.value} className="menu-section">
-              <h2 className="section-title">
-                {group.label}
-                <small>{itemsLabel(group.items.length)}</small>
-              </h2>
-              <div className="product-grid">
-                {group.items.map((p) => (
-                  <ProductCard key={p.id} product={p} />
-                ))}
-              </div>
-            </section>
-          ))}
-        </>
-      )}
+          </>
+        )}
+      </div>
     </div>
   )
 }
