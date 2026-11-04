@@ -17,7 +17,7 @@ from app.routes import (
     payments_bp,
     products_bp,
 )
-
+from app.routes.display import display_bp
 
 MIGRATIONS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "migrations")
 # Revisão que corresponde ao schema criado pelo antigo db.create_all().
@@ -72,6 +72,7 @@ def create_app(config_name=None):
     app.register_blueprint(orders_bp, url_prefix="/api/v1")
     app.register_blueprint(payments_bp, url_prefix="/api/v1")
     app.register_blueprint(events_bp, url_prefix="/api/v1")
+    app.register_blueprint(display_bp, url_prefix="/api/v1")
 
     with app.app_context():
         if config_name == "testing":
