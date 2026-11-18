@@ -12,6 +12,7 @@ import NotFoundPage from './pages/NotFoundPage'
 import { OrderProvider } from './context/OrderContext'
 import OrderSummaryPage from './pages/OrderSummaryPage'
 import { TotemLayout, TotemHome } from './pages/TotemPage'
+import TotemAssistantPage from './pages/TotemAssistantPage'
 import OrderDisplayPage from './pages/OrderDisplayPage'
 
 function Protected({ children }) {
@@ -28,6 +29,7 @@ export default function App() {
             <Route path="totem" element={<TotemLayout />}>
               <Route index element={<TotemHome />} />
               <Route path="cardapio" element={<MenuPage totem />} />
+              <Route path="assistente" element={<TotemAssistantPage />} />
               <Route path="pedido/resumo" element={<OrderSummaryPage totem />} />
               <Route path="pedido/:id/pagamento" element={<PaymentPage totem />} />
             </Route>

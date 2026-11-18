@@ -11,6 +11,7 @@ from app.config import config_by_name
 from app.extensions import cors, db, migrate
 from app.utils.error_handlers import register_error_handlers
 from app.routes import (
+    assistant_bp,
     auth_bp,
     events_bp,
     health_bp,
@@ -139,6 +140,7 @@ def create_app(config_name=None):
     app.register_blueprint(payments_bp, url_prefix="/api/v1")
     app.register_blueprint(events_bp, url_prefix="/api/v1")
     app.register_blueprint(display_bp, url_prefix="/api/v1")
+    app.register_blueprint(assistant_bp, url_prefix="/api/v1")
 
     with app.app_context():
         if config_name == "testing":

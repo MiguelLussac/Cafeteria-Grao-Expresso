@@ -4,6 +4,7 @@ from app.routes.products import products_bp
 from app.routes.orders import orders_bp
 from app.routes.payments import payments_bp
 from app.routes.events import events_bp
+from app.routes.assistant import assistant_bp
 
 __all__ = [
     "health_bp",
@@ -11,5 +12,6 @@ __all__ = [
     "products_bp",
     "orders_bp",
     "payments_bp",
-    "events_bp"
+    "events_bp",
+    "assistant_bp",
 ]
