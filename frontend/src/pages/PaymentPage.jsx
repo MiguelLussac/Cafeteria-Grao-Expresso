@@ -4,7 +4,7 @@ import { Check } from 'lucide-react'
 import { useOrder } from '../context/OrderContext'
 import { getOrder, registerSimulatedPayment } from '../services/api'
 import { Alert, Button, EmptyState, Loading } from '../components/ui'
-import { NutritionLine, NutritionSummary } from '../components/Nutrition'
+import { NutritionSummary } from '../components/Nutrition'
 import { PAYMENT_METHODS, formatPrice, paymentMethodLabel } from '../utils/format'
 
 const METHOD_HINTS = { dinheiro: 'no caixa', cartao: 'débito ou crédito', pix: 'QR Code' }
@@ -96,7 +96,6 @@ function Confirmation({ order, totem }) {
           <strong>{String(order.id).padStart(3, '0')}</strong>
         </div>
         <span className="status status-received">Recebido</span>
-        <NutritionLine items={nutritionItems(order)} />
       </div>
       <p>
         Acompanhe na TV do balcão: avisaremos quando estiver pronto

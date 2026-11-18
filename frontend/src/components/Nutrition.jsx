@@ -112,7 +112,6 @@ export function NutritionDisclosure({ nutrition }) {
           <ChevronDown size={16} aria-hidden="true" />
           Tabela nutricional
         </span>
-        <MacroLegend totals={nutrition} variant="compact" />
       </summary>
       <p className="nutrition-serving">Porção média: {formatServing(nutrition)}</p>
       <dl className="nutrition-table">

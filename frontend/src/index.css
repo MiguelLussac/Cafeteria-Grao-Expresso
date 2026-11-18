@@ -436,6 +436,9 @@ textarea {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 24px;
+  /* Sem isso, o grid estica todas as cards da linha para a altura da mais alta,
+     fazendo a tabela nutricional de um item "empurrar" os outros ao abrir. */
+  align-items: start;
 }
 
 .product-card {
