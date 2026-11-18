@@ -20,6 +20,7 @@ export const CATEGORIES = [
   { value: 'bebidas', label: 'Bebidas' },
   { value: 'doces', label: 'Doces' },
   { value: 'salgados', label: 'Salgados' },
+  { value: 'fitness', label: 'Fitness' },
 ]
 
 export function categoryLabel(value) {

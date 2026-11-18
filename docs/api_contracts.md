@@ -82,7 +82,7 @@ Todas as respostas de erro retornam um JSON padronizado:
 - **Endpoint:** `GET /api/v1/products`
 - **Acesso:** Público (Totem / Atendente / Cozinha)
 - **Query Params:**
-  - `category` *(opcional)*: `bebidas` | `doces` | `salgados`
+  - `category` *(opcional)*: `bebidas` | `doces` | `salgados` | `fitness`
   - `active_only` *(opcional, default: `true`)*: `true` | `false`
 - **Response `200 OK`:**
 ```json
@@ -131,7 +131,7 @@ Todas as respostas de erro retornam um JSON padronizado:
 - **Endpoint:** `POST /api/v1/products`
 - **Alias compatível com o quadro da sprint:** `POST /api/v1/cadastrar-produto/`
 - **Acesso:** Requer JWT com role `admin` ou `atendente`
-- **Campos obrigatórios:** `name` (texto não vazio, até 120 caracteres), `price` (número positivo, até duas casas decimais) e `category` (`bebidas`, `doces` ou `salgados`).
+- **Campos obrigatórios:** `name` (texto não vazio, até 120 caracteres), `price` (número positivo, até duas casas decimais) e `category` (`bebidas`, `doces`, `salgados` ou `fitness`).
 - **Campo opcional:** `description` (texto).
 - **Request Body:**
 ```json
