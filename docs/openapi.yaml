@@ -63,7 +63,7 @@ paths:
           name: category
           schema:
             type: string
-            enum: [bebidas, doces, salgados]
+            enum: [bebidas, doces, salgados, fitness]
           description: Filtrar por categoria
         - in: query
           name: active_only
@@ -88,7 +88,7 @@ paths:
                 name: { type: string, minLength: 1, maxLength: 120, example: "Café Expresso" }
                 description: { type: string, example: "Café encorpado 50ml" }
                 price: { type: number, format: float, minimum: 0, exclusiveMinimum: true, maximum: 99999999.99, multipleOf: 0.01, example: 6.50 }
-                category: { type: string, enum: [bebidas, doces, salgados] }
+                category: { type: string, enum: [bebidas, doces, salgados, fitness] }
       responses:
         '201':
           description: Produto criado com sucesso
@@ -118,7 +118,7 @@ paths:
                 name: { type: string, minLength: 1, maxLength: 120, example: "Café Expresso" }
                 description: { type: string, example: "Café encorpado 50ml" }
                 price: { type: number, format: float, minimum: 0, exclusiveMinimum: true, maximum: 99999999.99, multipleOf: 0.01, example: 6.50 }
-                category: { type: string, enum: [bebidas, doces, salgados] }
+                category: { type: string, enum: [bebidas, doces, salgados, fitness] }
       responses:
         '201':
           description: Produto criado com sucesso

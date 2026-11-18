@@ -17,5 +17,5 @@ CREATE TABLE IF NOT EXISTS products (
   INDEX ix_products_name (name),
   INDEX ix_products_category (category),
   CONSTRAINT chk_products_price    CHECK (price > 0),
-  CONSTRAINT chk_products_category CHECK (category IN ('bebidas','doces','salgados'))
+  CONSTRAINT chk_products_category CHECK (category IN ('bebidas','doces','salgados','fitness'))
 ) ENGINE=InnoDB;

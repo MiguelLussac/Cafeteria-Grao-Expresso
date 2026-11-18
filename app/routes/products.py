@@ -14,7 +14,7 @@ from app.utils.auth_decorator import role_required
 
 products_bp = Blueprint("products", __name__)
 
-VALID_CATEGORIES = ("bebidas", "doces", "salgados")
+VALID_CATEGORIES = ("bebidas", "doces", "salgados", "fitness")
 PRODUCT_FIELDS = {"name", "description", "price", "category", "image_url", "nutrition"}
 MAX_PRICE = Decimal("99999999.99")
 CENT = Decimal("0.01")

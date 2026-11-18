@@ -29,6 +29,8 @@
   --badge-doces-text: #8c1d18;
   --badge-salgados-bg: #f6ebc8;
   --badge-salgados-text: #5e4a0e;
+  --badge-fitness-bg: #e3f0e1;
+  --badge-fitness-text: #2f6b3a;
 
   /* Macronutrientes (design de nutrição por IA) */
   --macro-protein: #2e5e73;
@@ -462,6 +464,7 @@ textarea {
 }
 .product-media-doces { background: var(--badge-doces-bg); color: var(--badge-doces-text); }
 .product-media-salgados { background: var(--badge-salgados-bg); color: var(--badge-salgados-text); }
+.product-media-fitness { background: var(--badge-fitness-bg); color: var(--badge-fitness-text); }
 .product-media img {
   position: absolute;
   inset: 0;
@@ -788,6 +791,11 @@ textarea {
 .badge-salgados {
   background: var(--badge-salgados-bg);
   color: var(--badge-salgados-text);
+}
+
+.badge-fitness {
+  background: var(--badge-fitness-bg);
+  color: var(--badge-fitness-text);
 }
 
 .status {
