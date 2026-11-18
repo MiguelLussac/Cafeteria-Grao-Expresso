@@ -222,6 +222,12 @@ def _seed_initial_data():
                 price=8.00,
                 category="doces",
             ),
+            Product(
+                name="Bowl Fitness de Frutas com Granola",
+                description="Iogurte natural, frutas frescas da estação, granola crocante e mel",
+                price=15.00,
+                category="fitness",
+            ),
         ]
         db.session.add_all(demo_products)
         db.session.commit()
