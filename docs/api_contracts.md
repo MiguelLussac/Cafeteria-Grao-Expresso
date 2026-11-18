@@ -417,3 +417,37 @@ data: {"order_id": 101, "customer_name": "Mariana Silva", "table_number": "Mesa 
   "version": "1.0.0"
 }
 ```
+
+---
+
+## Assistente de pedidos do totem
+
+### `POST /api/v1/assistant/chat`
+- **Acesso:** Público (totem).
+- **Descrição:** uma rodada da conversa. O backend envia ao Gemini o cardápio ativo, o carrinho atual e o histórico, e devolve a resposta com o carrinho **completo** atualizado. Todo item é conferido contra o banco: produto inexistente/inativo ou quantidade inválida é descartado, e nome/preço vêm sempre do banco. Quantidade máxima por item: 20.
+- **Request Body:**
+```json
+{
+  "messages": [
+    { "role": "user", "content": "Quero um capuccino e um pão de queijo" }
+  ],
+  "cart": [ { "product_id": 1, "quantity": 1 } ]
+}
+```
+  - `messages`: 1 a 30 mensagens, `role` = `user` ou `assistant`; a última deve ser do cliente; mensagens do cliente com até 500 caracteres.
+  - `cart` *(opcional)*: carrinho atual do totem.
+- **Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "reply": "Anotei 1 Capuccino Italiano e 1 Pão de Queijo Mineiro. Quer mais alguma coisa?",
+    "cart": [
+      { "product_id": 2, "name": "Capuccino Italiano", "price": 11.0, "category": "bebidas", "nutrition": null, "quantity": 1 }
+    ],
+    "ready_to_checkout": false
+  }
+}
+```
+- **Erros:** `400` (requisição inválida), `503` (assistente não configurado: falta `GEMINI_API_KEY`), `502` (falha ou resposta inválida da IA).
+

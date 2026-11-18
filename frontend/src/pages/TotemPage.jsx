@@ -33,12 +33,12 @@ export function TotemHome() {
             <span>Escolha no cardápio, do seu jeito.</span>
             <ArrowRight className="totem-arrow" aria-hidden="true" />
           </Link>
-          <button className="totem-option" type="button" disabled>
+          <Link className="totem-option" to="/totem/assistente">
             <MessageSquare aria-hidden="true" />
-            <span className="totem-soon">Em breve</span>
             <strong>Pedir conversando com o assistente</strong>
             <span>Escreva o que quer, como falaria no balcão.</span>
-          </button>
+            <ArrowRight className="totem-arrow totem-arrow-light" aria-hidden="true" />
+          </Link>
         </div>
       </section>
       <footer><span>Toque em uma opção para começar</span><span>Pix · Cartão · Dinheiro</span></footer>

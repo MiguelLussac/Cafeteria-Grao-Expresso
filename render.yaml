@@ -32,6 +32,9 @@ services:
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
+      # Assistente de pedidos do totem (Gemini). Valor só no painel.
+      - key: GEMINI_API_KEY
+        sync: false
 
   - type: web
     name: grao-expresso-front

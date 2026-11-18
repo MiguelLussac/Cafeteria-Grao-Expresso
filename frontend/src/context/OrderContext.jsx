@@ -25,6 +25,11 @@ export function OrderProvider({ children }) {
     if (!locked) setItems((current) => removeProduct(current, id))
   }
 
+  // O assistente do totem devolve o carrinho completo a cada resposta.
+  function replaceItems(nextItems) {
+    if (!locked) setItems(nextItems)
+  }
+
   const startNewOrder = useCallback(() => {
     if (isSubmitting) return
     setItems([])
@@ -46,7 +51,7 @@ export function OrderProvider({ children }) {
 
   return (
     <OrderContext.Provider value={{ items, details, setDetails, addItem, setQuantity,
-      removeItem, startNewOrder, createdOrder, isSubmitting, confirmOrder }}>
+      removeItem, replaceItems, startNewOrder, createdOrder, isSubmitting, confirmOrder }}>
       {children}
     </OrderContext.Provider>
   )

@@ -90,3 +90,72 @@
   .totem-payment .payment-methods legend { grid-column: 1 / -1; }
   .totem-payment .payment-method { flex-wrap: wrap; }
 }
+
+/* ---------- Assistente de pedidos (chat) ---------- */
+.totem-chat { grid-template-areas: "heading selection" "chat selection"; }
+.totem-chat .chat {
+  grid-area: chat;
+  display: flex;
+  flex-direction: column;
+  gap: .75rem;
+  padding: 1rem;
+  min-height: min(34rem, 70dvh);
+  background: white;
+}
+.chat-log {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: .75rem;
+  margin: 0;
+  padding: .25rem;
+  list-style: none;
+  overflow-y: auto;
+  max-height: 55dvh;
+}
+.chat-message { display: flex; align-items: flex-end; gap: .5rem; max-width: 85%; }
+.chat-message p {
+  margin: 0;
+  padding: .7rem 1rem;
+  border-radius: 1rem;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.chat-assistant p { background: var(--totem-paper); border-bottom-left-radius: .25rem; }
+.chat-user { align-self: flex-end; }
+.chat-user p { background: var(--totem-brown); color: white; border-bottom-right-radius: .25rem; }
+.chat-avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: var(--totem-brown);
+  color: white;
+}
+.chat-typing p { color: #7a6a5c; font-style: italic; }
+.chat-suggestions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.chat-suggestions .chip { min-height: 2.75rem; }
+.chat-form { display: flex; gap: .5rem; }
+.chat-input {
+  flex: 1;
+  min-width: 0;
+  min-height: 3rem;
+  padding: .6rem 1rem;
+  border: 1px solid var(--totem-brown);
+  border-radius: .75rem;
+  background: white;
+}
+.chat-form .btn { min-width: 3.25rem; }
+.chat-checkout { display: inline-flex; justify-content: center; align-items: center; gap: .5rem; min-height: 3.25rem; }
+.chat-note { display: flex; align-items: center; gap: .35rem; margin: 0; font-size: .8rem; color: #7a6a5c; }
+.totem-large :is(.chat-message p, .chat-input, .chat-suggestions .chip) { font-size: 1.2rem; }
+@media (max-width: 850px) {
+  .totem-chat { grid-template-areas: "heading" "chat" "selection"; }
+  .chat-message { max-width: 100%; }
+}
+.totem-arrow-light { background: var(--totem-brown); color: white; }
+.totem-option:not(.totem-option-order) { padding-right: 4rem; }
+.totem-option:not(.totem-option-order):hover { border-color: #533923; background: #fdfbf8; }

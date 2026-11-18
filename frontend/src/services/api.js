@@ -251,3 +251,12 @@ export function subscribeOrderEvents({ onConnected, onEvent, onError } = {}) {
 export async function checkHealth() {
   return request('/health')
 }
+
+// ---------- Assistente do totem ----------
+
+// messages: [{ role: 'user' | 'assistant', content }]; cart: [{ product_id, quantity }]
+// Retorna { reply, cart, ready_to_checkout }. Erro 503 = assistente não configurado.
+export async function assistantChat(messages, cart) {
+  const res = await request('/assistant/chat', { method: 'POST', body: { messages, cart } })
+  return res.data
+}

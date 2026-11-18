@@ -32,6 +32,11 @@ class Config:
     MAX_IMAGE_BYTES = 2 * 1024 * 1024
     MAX_CONTENT_LENGTH = 3 * 1024 * 1024
 
+    # Assistente de pedidos do totem (Gemini). Sem a chave, o chat responde
+    # 503 e o totem orienta o cliente a usar o cardápio.
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or None
+    GEMINI_MODEL = os.getenv("GEMINI_MODEL") or None
+
 
 class DevelopmentConfig(Config):
     """Configurações para desenvolvimento local."""
@@ -48,6 +53,8 @@ class TestingConfig(Config):
     # Testes nunca enviam arquivos ao Storage real (ver tests com monkeypatch).
     SUPABASE_URL = None
     SUPABASE_SERVICE_ROLE_KEY = None
+    # Testes usam IA simulada (monkeypatch), nunca o Gemini real.
+    GEMINI_API_KEY = None
 
 
 class ProductionConfig(Config):
