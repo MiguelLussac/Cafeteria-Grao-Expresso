@@ -424,7 +424,7 @@ data: {"order_id": 101, "customer_name": "Mariana Silva", "table_number": "Mesa 
 
 ### `POST /api/v1/assistant/chat`
 - **Acesso:** Público (totem).
-- **Descrição:** uma rodada da conversa. O backend envia ao Gemini o cardápio ativo, o carrinho atual e o histórico, e devolve a resposta com o carrinho **completo** atualizado. Todo item é conferido contra o banco: produto inexistente/inativo ou quantidade inválida é descartado, e nome/preço vêm sempre do banco. Quantidade máxima por item: 20.
+- **Descrição:** uma rodada da conversa. O backend envia ao Gemini o cardápio ativo, o histórico e, junto da última mensagem, o pedido atual da tela (que o cliente também pode alterar pelos botões). A IA devolve só as **mudanças** pedidas na última mensagem, que o backend aplica sobre o pedido atual; a resposta da API traz o carrinho **completo** atualizado. Assim um item removido pelo cliente na tela não volta sozinho. Todo item é conferido contra o banco: produto inexistente/inativo ou quantidade inválida é descartado, e nome/preço vêm sempre do banco. Quantidade máxima por item: 20.
 - **Request Body:**
 ```json
 {
