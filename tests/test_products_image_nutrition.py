@@ -106,7 +106,7 @@ def test_migracoes_criam_banco_novo(tmp_path, monkeypatch):
         columns = {c["name"] for c in inspect(db.engine).get_columns("products")}
         assert {"image_url", "serving_size", "serving_unit", "nutrition_status"} <= columns
         assert {p.nutrition_status for p in Product.query} == {"pending"}
-        assert Product.query.count() == 7
+        assert Product.query.count() == 8
 
 
 def test_migracoes_atualizam_banco_criado_pelo_create_all(tmp_path, monkeypatch):
