@@ -73,6 +73,8 @@ class OrderItem(db.Model):
             "id": self.id,
             "product_id": self.product_id,
             "product_name": self.product.name if self.product else None,
+            "category": self.product.category if self.product else None,
+            "image_url": self.product.image_url if self.product else None,
             "nutrition": self.product.nutrition_dict() if self.product else None,
             "quantity": self.quantity,
             "unit_price": float(self.unit_price),

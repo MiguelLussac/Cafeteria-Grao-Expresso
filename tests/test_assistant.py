@@ -73,6 +73,7 @@ def test_carrinho_usa_nome_e_preco_do_banco(client, ia):
         "name": produto.name,
         "price": float(produto.price),
         "category": produto.category,
+        "image_url": produto.image_url,
         "nutrition": None,
         "quantity": 2,
     }]

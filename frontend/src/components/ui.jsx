@@ -1,7 +1,7 @@
 // Componentes visuais compartilhados.
 // Use-os nas telas para manter o padrão visual do design.
-import { useEffect, useRef } from 'react'
-import { AlertCircle, CheckCircle2, Info, X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { AlertCircle, CheckCircle2, ImageIcon, Info, X } from 'lucide-react'
 import { categoryLabel } from '../utils/format'
 
 export function Button({ variant = 'primary', type = 'button', block = false, className = '', ...props }) {
@@ -112,5 +112,19 @@ export function Modal({ titleId, onClose, children }) {
         {children}
       </div>
     </div>
+  )
+}
+
+// Miniatura do produto em listas de pedido. Sem foto (ou se a foto falhar),
+// mostra o ícone na cor da categoria, como no card do cardápio.
+export function ItemThumb({ imageUrl, category, size = 'md' }) {
+  const [failed, setFailed] = useState(false)
+  const showImage = imageUrl && !failed
+  return (
+    <span className={`item-thumb item-thumb-${size} product-media-${category ?? 'bebidas'}`} aria-hidden="true">
+      {showImage
+        ? <img src={imageUrl} alt="" loading="lazy" onError={() => setFailed(true)} />
+        : <ImageIcon size={size === 'sm' ? 18 : 22} />}
+    </span>
   )
 }

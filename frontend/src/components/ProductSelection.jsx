@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Button } from './ui'
+import { Button, ItemThumb } from './ui'
 import { useOrder } from '../context/OrderContext'
 import { formatPrice } from '../utils/format'
 import { estimatedTotal, itemsQuantity } from '../utils/order'
@@ -29,7 +29,10 @@ export default function ProductSelection({ totem = false }) {
           <ul className="selection-items">
             {items.map((item) => (
               <li key={item.id}>
-                <div><strong>{item.name}</strong><p>{formatPrice(item.price)} por unidade</p></div>
+                <div className="selection-item-main">
+                  <ItemThumb imageUrl={item.image_url} category={item.category} size="sm" />
+                  <div><strong>{item.name}</strong><p>{formatPrice(item.price)} por unidade</p></div>
+                </div>
                 <div className="quantity-controls">
                   <Button variant="outline" disabled={locked || item.quantity <= 1}
                     aria-label={`Diminuir quantidade de ${item.name}`} onClick={() => setQuantity(item.id, item.quantity - 1)}>−</Button>

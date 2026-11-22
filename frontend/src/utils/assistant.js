@@ -36,6 +36,7 @@ export function itemsFromAssistant(cart) {
       price: item.price,
       quantity: item.quantity,
       category: item.category,
+      image_url: item.image_url ?? null,
       nutrition: item.nutrition ?? null,
     }))
 }

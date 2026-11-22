@@ -757,6 +757,41 @@ textarea {
 .nutrition-summary-empty p { margin: 2px 0 0; font-size: 0.9rem; color: var(--color-muted); }
 .nutrition-summary-empty svg { flex: none; margin-top: 2px; }
 
+/* Informação nutricional recolhida (pagamento): uma linha discreta, abre sob demanda. */
+.nutrition-compact {
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+.nutrition-compact-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  width: 100%;
+  min-height: 52px;
+  padding: 10px 18px;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  color: var(--color-muted);
+  font: inherit;
+  font-size: 0.95rem;
+  text-align: left;
+  cursor: pointer;
+}
+.nutrition-compact-toggle:hover { color: var(--color-text); }
+.nutrition-compact-title { font-weight: 600; color: var(--color-text); }
+.nutrition-compact-kcal { font-variant-numeric: tabular-nums; }
+.nutrition-compact .ai-badge { color: var(--color-muted); font-weight: 400; }
+.nutrition-compact-chevron { margin-left: auto; transform: rotate(-90deg); transition: transform 0.15s; }
+.nutrition-compact-toggle[aria-expanded="true"] .nutrition-compact-chevron { transform: none; }
+.nutrition-compact-body { padding: 0 18px 18px; }
+.nutrition-compact-body .macro-bar { height: 8px; margin: 12px 0; }
+.nutrition-compact-body .macro-legend strong { font-size: 1.05rem; }
+@media (prefers-reduced-motion: reduce) {
+  .nutrition-compact-chevron { transition: none; }
+}
+
 .nutrition-line {
   display: grid;
   justify-items: center;
@@ -1387,17 +1422,34 @@ textarea {
 
 /* ---------- Pagamento ---------- */
 
-.payment-order { padding: 24px; }
-.payment-order header {
+.card.payment-order { --pad: 28px; padding: var(--pad) var(--pad) 0; overflow: hidden; }
+@media (max-width: 640px) { .card.payment-order { --pad: 18px; } }
+.payment-order-head {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
-  gap: 4px 16px;
+  gap: 8px 16px;
   margin-bottom: 8px;
 }
-.payment-order h2 { font-size: 1.2rem; }
-.payment-order header span { font-size: 0.9rem; color: var(--color-muted); overflow-wrap: anywhere; }
+.payment-order-head h2 { font-size: 1.5rem; font-weight: 800; }
+.payment-order-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.payment-order-tags li {
+  padding: 3px 12px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-alt);
+  color: var(--color-primary-hover);
+  font-size: 0.85rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
 
 .payment-items {
   list-style: none;
@@ -1407,34 +1459,65 @@ textarea {
 
 .payment-items li {
   display: grid;
-  grid-template-columns: 2.5rem minmax(0, 1fr) auto;
-  gap: 8px;
-  padding: 10px 0;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 0;
   border-bottom: 1px solid var(--color-border);
 }
 .payment-items li:last-child { border-bottom: 0; }
-.payment-qty { font-weight: 700; color: var(--color-primary); }
+/* Quantidade sobre o canto da miniatura: a foto identifica, o selo conta. */
+.payment-item-media { position: relative; display: block; width: 56px; height: 56px; }
+.payment-qty {
+  position: absolute;
+  right: -8px;
+  bottom: -6px;
+  min-width: 28px;
+  padding: 1px 7px;
+  border: 2px solid var(--color-surface);
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+  color: var(--color-primary-contrast);
+  font-size: 0.8rem;
+  font-weight: 800;
+  line-height: 1.4;
+  text-align: center;
+}
+.payment-item-name { display: grid; gap: 2px; overflow-wrap: anywhere; }
+.payment-item-name strong { font-size: 1.1rem; font-weight: 600; }
+.payment-item-name small { font-size: 0.85rem; color: var(--color-muted); }
+.payment-item-price { font-size: 1.1rem; font-weight: 700; white-space: nowrap; }
 
-.payment-subtotal {
-  display: flex;
-  justify-content: space-between;
-  padding-top: 4px;
-  font-size: 0.9rem;
-  color: var(--color-muted);
+.payment-order-notes {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--color-bg);
+  font-size: 0.95rem;
+  overflow-wrap: anywhere;
 }
 
-.payment-total {
+/* Total no pé do card: o fechamento natural da lista de itens. */
+.payment-order-total {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  font-size: 1.1rem;
-  font-weight: 700;
+  gap: 16px;
+  margin: 0 calc(-1 * var(--pad));
+  padding: 18px var(--pad) 22px;
+  border-top: 2px solid var(--color-text);
+  background: var(--color-surface-alt);
 }
-
-.payment-total strong {
-  font-size: 1.75rem;
+.payment-order-total > span { font-size: 1.15rem; font-weight: 700; }
+.payment-order-total small { font-size: 0.9rem; font-weight: 400; color: var(--color-muted); }
+.payment-order-total strong {
+  font-size: 2.25rem;
+  font-weight: 800;
+  line-height: 1;
   color: var(--color-primary);
 }
+
+.payment-submit .btn { min-height: 56px; font-size: 1.05rem; }
 
 .checkout-total .form-note { text-align: center; }
 
@@ -1740,6 +1823,7 @@ textarea {
 .selection-items { list-style: none; padding: 0; margin: 16px 0; }
 .selection-items li { padding: 12px 0; border-bottom: 1px solid var(--color-border); }
 .selection-items p { margin: 4px 0; color: var(--color-muted); }
+.selection-item-main { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .selection-actions { margin-top: 16px; }
 .quantity-controls { display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; }
 .quantity-field { display: flex; flex-direction: column; gap: 4px; font-size: .8rem; }
@@ -2050,10 +2134,16 @@ textarea {
 .item-thumb {
   display: grid;
   place-items: center;
+  flex: none;
   width: 64px;
   height: 64px;
   border-radius: 8px;
+  overflow: hidden;
 }
+.item-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.item-thumb svg { opacity: 0.6; }
+.payment-item-media .item-thumb { width: 56px; height: 56px; }
+.item-thumb-sm { width: 44px; height: 44px; border-radius: 6px; }
 .review-item-info { display: grid; justify-items: start; gap: 4px; overflow-wrap: anywhere; }
 .review-item-info strong { font-size: 1.05rem; }
 .review-item-unit { font-size: 0.9rem; color: var(--color-muted); }
@@ -2106,8 +2196,8 @@ textarea {
     gap: 10px 12px;
     padding: 14px 16px;
   }
-  .item-thumb { width: 56px; height: 56px; grid-area: thumb; }
-  .item-thumb svg { display: none; }
+  .review-items .item-thumb { width: 56px; height: 56px; grid-area: thumb; }
+  .review-items .item-thumb svg { display: none; }
   .review-item-info { grid-area: info; }
   .review-item-total { grid-area: total; align-self: start; }
   .stepper { grid-area: stepper; justify-self: end; }
