@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Check } from 'lucide-react'
 import { useOrder } from '../context/OrderContext'
 import { getOrder, registerSimulatedPayment } from '../services/api'
-import { Alert, Button, EmptyState, Loading } from '../components/ui'
+import { Alert, Button, EmptyState, ItemThumb, Loading } from '../components/ui'
 import { NutritionSummary } from '../components/Nutrition'
 import { PAYMENT_METHODS, formatPrice, paymentMethodLabel } from '../utils/format'
 
@@ -26,26 +26,43 @@ function itemsCount(order) {
   return (order.items ?? []).reduce((total, item) => total + item.quantity, 0)
 }
 
-function orderMeta(order) {
-  return [order.customer_name, order.table_number, order.notes && `“${order.notes}”`].filter(Boolean).join(' · ')
-}
-
 function OrderItems({ order }) {
+  const count = itemsCount(order)
+  const tags = [order.customer_name, order.table_number].filter(Boolean)
   return (
     <section className="card payment-order" aria-labelledby="payment-order-title">
-      <header>
+      <header className="payment-order-head">
         <h2 id="payment-order-title">Seu pedido</h2>
-        <span>{orderMeta(order)}</span>
+        {tags.length > 0 && (
+          <ul className="payment-order-tags" aria-label="Detalhes do pedido">
+            {tags.map((tag) => <li key={tag}>{tag}</li>)}
+          </ul>
+        )}
       </header>
       <ul className="payment-items">
         {(order.items ?? []).map((item) => (
           <li key={item.id}>
-            <span className="payment-qty">{item.quantity}×</span>
-            <span>{item.product_name ?? `Produto ${item.product_id}`}</span>
-            <strong>{formatPrice(item.subtotal)}</strong>
+            <span className="payment-item-media">
+              <ItemThumb imageUrl={item.image_url} category={item.category} />
+              <span className="payment-qty">
+                {item.quantity}<span aria-hidden="true">×</span>
+              </span>
+            </span>
+            <span className="payment-item-name">
+              <strong>{item.product_name ?? `Produto ${item.product_id}`}</strong>
+              {item.quantity > 1 && <small>{formatPrice(item.unit_price)} cada</small>}
+            </span>
+            <span className="payment-item-price">{formatPrice(item.subtotal)}</span>
           </li>
         ))}
       </ul>
+      {order.notes && (
+        <p className="payment-order-notes"><strong>Observação:</strong> {order.notes}</p>
+      )}
+      <footer className="payment-order-total">
+        <span>Total <small>({count} {count === 1 ? 'item' : 'itens'})</small></span>
+        <strong>{formatPrice(order.total_amount)}</strong>
+      </footer>
     </section>
   )
 }
@@ -208,7 +225,6 @@ export default function PaymentPage({ totem = false }) {
     )
   }
 
-  const count = itemsCount(order)
   return (
     <div className="container page">
       <header className="page-header">
@@ -222,8 +238,8 @@ export default function PaymentPage({ totem = false }) {
       <form className={totem ? "checkout totem-payment" : "checkout"} onSubmit={handleSubmit} noValidate>
         <div className="checkout-main">
           <OrderItems order={order} />
-          {/* Resumo antes do preço: o cliente vê o que vai consumir antes de pagar. */}
-          <NutritionSummary items={nutritionItems(order)} collapsible />
+          {/* Informação nutricional fica disponível, mas recolhida: o foco aqui é conferir e pagar. */}
+          <NutritionSummary items={nutritionItems(order)} compact />
         </div>
 
         <aside className="checkout-side">
@@ -250,15 +266,7 @@ export default function PaymentPage({ totem = false }) {
             </Alert>
           )}
 
-          <div className="card checkout-total">
-            <div className="payment-subtotal">
-              <span>Subtotal · {count} {count === 1 ? 'item' : 'itens'}</span>
-              <span>{formatPrice(order.total_amount)}</span>
-            </div>
-            <div className="payment-total">
-              <span>Total</span>
-              <strong>{formatPrice(order.total_amount)}</strong>
-            </div>
+          <div className="card checkout-total payment-submit">
             <Button type="submit" block disabled={submitting}>
               {submitting ? 'Processando pagamento...' : `Confirmar e pagar ${formatPrice(order.total_amount)}`}
             </Button>

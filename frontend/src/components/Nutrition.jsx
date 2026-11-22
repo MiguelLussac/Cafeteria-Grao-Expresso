@@ -178,13 +178,16 @@ function joinNames(names) {
 
 // Resumo nutricional do pedido. items: [{ name, quantity, nutrition }].
 // collapsible: no mobile o cabeçalho abre e fecha o bloco (aberto por padrão).
-export function NutritionSummary({ items, collapsible = false }) {
+// compact: uma linha discreta ("Informação nutricional · 130 kcal"), fechada por
+// padrão em qualquer tela — usado no pagamento, onde o foco é o pedido.
+export function NutritionSummary({ items, collapsible = false, compact = false }) {
   const summary = orderNutrition(items)
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(!compact)
   const [showItems, setShowItems] = useState(false)
   const bodyId = useId()
 
   if (summary.status === 'empty') {
+    if (compact) return null
     return (
       <section className="nutrition-summary nutrition-summary-empty" aria-label="Resumo nutricional">
         <Info size={18} aria-hidden="true" />
@@ -200,6 +203,66 @@ export function NutritionSummary({ items, collapsible = false }) {
   const partial = summary.status === 'partial'
   const percent = referenceDietPercent(totals.calories_kcal)
 
+  const details = (
+    <>
+      {partial && (
+        <span className="partial-chip">Parcial · {summary.counted} de {summary.count} itens</span>
+      )}
+      {!compact && (
+        <p className="nutrition-summary-kcal">
+          {formatInteger(totals.calories_kcal)} kcal
+          {partial && <small>parcial</small>}
+        </p>
+      )}
+      <p className="nutrition-summary-ref">
+        {partial && `Sem ${joinNames(missing)} · `}
+        ≈ {percent}% de {partial ? '' : 'uma dieta de referência de '}
+        {formatInteger(REFERENCE_DIET_KCAL)} kcal
+        {!partial && <span className="nutrition-summary-ref-extra"> · necessidades variam de pessoa para pessoa</span>}
+      </p>
+
+      <MacroBar totals={totals} />
+      <MacroLegend totals={totals} />
+
+      {partial && (
+        <p className="nutrition-missing">
+          <Info size={14} aria-hidden="true" />
+          <span><strong>{joinNames(missing)}:</strong> informação indisponível — não entra no total.</span>
+        </p>
+      )}
+
+      <button type="button" className="btn btn-outline btn-block nutrition-items-toggle"
+        aria-expanded={showItems} onClick={() => setShowItems((v) => !v)}>
+        {showItems ? 'Ocultar itens' : 'Ver por item'}
+      </button>
+      {showItems && <ItemsTable rows={summary.rows} totals={totals} />}
+
+      <p className="ai-note">
+        <Sparkles size={12} aria-hidden="true" />
+        Valores médios estimados por IA a partir de receitas típicas. Podem variar conforme o preparo.
+      </p>
+    </>
+  )
+
+  if (compact) {
+    return (
+      <section className="nutrition-compact" aria-label="Informação nutricional">
+        <button type="button" className="nutrition-compact-toggle" aria-expanded={open} aria-controls={bodyId}
+          onClick={() => setOpen((v) => !v)}>
+          <span className="nutrition-compact-title">Informação nutricional</span>
+          <span className="nutrition-compact-kcal">
+            {formatInteger(totals.calories_kcal)} kcal{partial && ' (parcial)'}
+          </span>
+          <AiBadge variant="text" />
+          <ChevronDown className="nutrition-compact-chevron" size={18} aria-hidden="true" />
+        </button>
+        <div id={bodyId} className="nutrition-compact-body" hidden={!open}>
+          {details}
+        </div>
+      </section>
+    )
+  }
+
   return (
     <section className="card nutrition-summary" aria-labelledby={`${bodyId}-title`}>
       <header className="nutrition-summary-head">
@@ -214,40 +277,7 @@ export function NutritionSummary({ items, collapsible = false }) {
       </header>
 
       <div id={bodyId} hidden={collapsible && !open}>
-        {partial && (
-          <span className="partial-chip">Parcial · {summary.counted} de {summary.count} itens</span>
-        )}
-        <p className="nutrition-summary-kcal">
-          {formatInteger(totals.calories_kcal)} kcal
-          {partial && <small>parcial</small>}
-        </p>
-        <p className="nutrition-summary-ref">
-          {partial && `Sem ${joinNames(missing)} · `}
-          ≈ {percent}% de {partial ? '' : 'uma dieta de referência de '}
-          {formatInteger(REFERENCE_DIET_KCAL)} kcal
-          {!partial && <span className="nutrition-summary-ref-extra"> · necessidades variam de pessoa para pessoa</span>}
-        </p>
-
-        <MacroBar totals={totals} />
-        <MacroLegend totals={totals} />
-
-        {partial && (
-          <p className="nutrition-missing">
-            <Info size={14} aria-hidden="true" />
-            <span><strong>{joinNames(missing)}:</strong> informação indisponível — não entra no total.</span>
-          </p>
-        )}
-
-        <button type="button" className="btn btn-outline btn-block nutrition-items-toggle"
-          aria-expanded={showItems} onClick={() => setShowItems((v) => !v)}>
-          {showItems ? 'Ocultar itens' : 'Ver por item'}
-        </button>
-        {showItems && <ItemsTable rows={summary.rows} totals={totals} />}
-
-        <p className="ai-note">
-          <Sparkles size={12} aria-hidden="true" />
-          Valores médios estimados por IA a partir de receitas típicas. Podem variar conforme o preparo.
-        </p>
+        {details}
       </div>
     </section>
   )

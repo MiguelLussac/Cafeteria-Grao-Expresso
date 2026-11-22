@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, ImageIcon, Minus, Plus, Sparkles, Trash2 } from 'lucide-react'
-import { Alert, Button, EmptyState, Field } from '../components/ui'
+import { ArrowLeft, ArrowRight, Minus, Plus, Sparkles, Trash2 } from 'lucide-react'
+import { Alert, Button, EmptyState, Field, ItemThumb } from '../components/ui'
 import { KcalPill } from '../components/Nutrition'
 import { useOrder } from '../context/OrderContext'
 import { formatPrice } from '../utils/format'
@@ -58,9 +58,7 @@ export default function OrderSummaryPage({ totem = false }) {
             <ul aria-label="Itens do pedido">
               {items.map((item) => (
                 <li key={item.id}>
-                  <span className={`item-thumb product-media-${item.category}`} aria-hidden="true">
-                    <ImageIcon size={22} />
-                  </span>
+                  <ItemThumb imageUrl={item.image_url} category={item.category} />
                   <div className="review-item-info">
                     <strong>{item.name}</strong>
                     <span className="review-item-unit">{formatPrice(item.price)} cada</span>

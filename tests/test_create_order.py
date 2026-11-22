@@ -13,7 +13,8 @@ def client():
     app = create_app()
     with app.app_context():
         db.session.add_all([
-            Product(name="Cafe", price=6.50),                    # id 1
+            Product(name="Cafe", price=6.50, category="bebidas",
+                    image_url="https://exemplo.com/cafe.webp"),  # id 1
             Product(name="Pao de queijo", price=0.10),           # id 2
             Product(name="Suco", price=8.00, is_active=False),   # id 3 (inativo)
         ])
@@ -45,6 +46,16 @@ def test_pedido_valido_varios_itens_total_exato(client):
     assert r.status_code == 201
     assert r.json["data"]["total_amount"] == 6.8  # 6.50 + 3 * 0.10, sem erro de ponto flutuante
     assert contagem(client) == (1, 2)
+
+
+def test_detalhe_do_pedido_traz_categoria_e_foto_dos_itens(client):
+    criado = criar(client, items=[{"product_id": 1, "quantity": 1}, {"product_id": 2}])
+    r = client.get(f"/api/v1/orders/{criado.json['data']['id']}")
+    assert r.status_code == 200
+    itens = {i["product_id"]: i for i in r.json["data"]["items"]}
+    assert itens[1]["category"] == "bebidas"
+    assert itens[1]["image_url"] == "https://exemplo.com/cafe.webp"
+    assert itens[2]["image_url"] is None
 
 
 def test_quantidade_ausente_assume_um(client):

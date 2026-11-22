@@ -233,6 +233,7 @@ def cart_payload(quantities, products_by_id):
             "name": product.name,
             "price": float(product.price),
             "category": product.category,
+            "image_url": product.image_url,
             "nutrition": product.nutrition_dict(),
             "quantity": quantity,
         })
