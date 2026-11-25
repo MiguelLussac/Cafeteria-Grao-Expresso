@@ -105,8 +105,17 @@ def test_migracoes_criam_banco_novo(tmp_path, monkeypatch):
     with app.app_context():
         columns = {c["name"] for c in inspect(db.engine).get_columns("products")}
         assert {"image_url", "serving_size", "serving_unit", "nutrition_status"} <= columns
-        assert {p.nutrition_status for p in Product.query} == {"pending"}
-        assert Product.query.count() == 8
+        assert Product.query.count() == 18
+        fit = Product.query.filter_by(nutrition_source="manual").all()
+        assert len(fit) == 10
+        assert {p.category for p in fit} == {"fitness"}
+        assert {p.nutrition_status for p in fit} == {"ready"}
+        assert all(p.image_url.startswith("https://") and ".wikimedia.org/" in p.image_url for p in fit)
+        for p in fit:
+            calories = 4 * float(p.protein_g) + 4 * float(p.carbs_g) + 9 * float(p.fat_g)
+            assert float(p.calories_kcal) == round(calories, 1) <= 260
+        demais = Product.query.filter(Product.nutrition_source.is_(None))
+        assert {p.nutrition_status for p in demais} == {"pending"}
 
 
 def test_migracoes_atualizam_banco_criado_pelo_create_all(tmp_path, monkeypatch):
@@ -129,8 +138,9 @@ def test_migracoes_atualizam_banco_criado_pelo_create_all(tmp_path, monkeypatch)
 
     app = create_app("development")
     with app.app_context():
-        products = Product.query.all()
+        products = Product.query.filter(Product.nutrition_source.is_(None)).all()
         assert [p.name for p in products] == ["Café antigo"]
+        assert Product.query.filter_by(category="fitness", nutrition_status="ready").count() == 10
         assert products[0].to_dict()["nutrition"] is None
         assert products[0].nutrition_status == "pending"
 
@@ -154,13 +164,16 @@ def test_banco_recusa_tabela_nutricional_invalida(tmp_path, monkeypatch, sql):
     monkeypatch.setattr(DevelopmentConfig, "SQLALCHEMY_DATABASE_URI", f"sqlite:///{tmp_path / 'ck.db'}")
     app = create_app("development")
     with app.app_context():
+        # Alvo: um produto ainda sem tabela (os itens fit já vêm com tabela manual).
+        product_id = Product.query.filter_by(nutrition_status="pending").first().id
+        sql = sql.replace("id = 1", f"id = {product_id}")
         with pytest.raises(IntegrityError):
             db.session.execute(text(sql))
             db.session.commit()
         db.session.rollback()
-        db.session.execute(text(f"UPDATE products SET {VALID_ROW} WHERE id = 1"))
+        db.session.execute(text(f"UPDATE products SET {VALID_ROW} WHERE id = {product_id}"))
         db.session.commit()
-        assert db.session.get(Product, 1).to_dict()["nutrition"]["source"] == "ai"
+        assert db.session.get(Product, product_id).to_dict()["nutrition"]["source"] == "ai"
 
 
 def _set_ai_nutrition(product_id=1):

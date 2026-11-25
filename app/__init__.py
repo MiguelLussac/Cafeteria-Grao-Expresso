@@ -180,7 +180,9 @@ def _seed_initial_data():
         db.session.add_all([admin, atendente, barista])
         db.session.commit()
 
-    if Product.query.count() == 0:
+    # A migração e4b8d2f6a103 já cadastra itens fitness; os demais itens de
+    # demonstração entram quando ainda não há produtos de outras categorias.
+    if Product.query.filter(Product.category != "fitness").count() == 0:
         demo_products = [
             Product(
                 name="Café Expresso Tradicional",
