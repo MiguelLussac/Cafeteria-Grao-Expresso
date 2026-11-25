@@ -114,10 +114,17 @@ function Confirmation({ order, totem }) {
         </div>
         <span className="status status-received">Recebido</span>
       </div>
-      <p>
-        Acompanhe na TV do balcão: avisaremos quando estiver pronto
-        {order.customer_name ? `, ${order.customer_name}` : ''}.
-      </p>
+      {order.channel === 'site' ? (
+        <p>
+          Acompanhe o número <strong>{String(order.id).padStart(3, '0')}</strong> no monitor da loja
+          e retire no balcão quando ele aparecer em “Pronto para retirada”.
+        </p>
+      ) : (
+        <p>
+          Acompanhe na TV do balcão: avisaremos quando estiver pronto
+          {order.customer_name ? `, ${order.customer_name}` : ''}.
+        </p>
+      )}
       {totem ? <TotemNewOrderButton /> : (
         <Link to="/" className="btn btn-outline">Voltar ao cardápio</Link>
       )}

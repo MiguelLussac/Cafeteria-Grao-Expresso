@@ -9,6 +9,8 @@ export default function ProductSelection({ totem = false }) {
   const prefix = totem ? '/totem' : ''
   const count = itemsQuantity(items)
   const locked = isSubmitting || !!createdOrder
+  // No site todo pedido é para retirada no balcão; no totem o cliente escolhe na revisão.
+  const reviewLabel = totem ? 'Revisar pedido' : 'Pedir para retirar'
   return (
     <section className="selection card" aria-label="Seu pedido">
       <div className="selection-heading">
@@ -50,8 +52,8 @@ export default function ProductSelection({ totem = false }) {
           </ul>
           <div className="selection-actions">
             <strong>Total estimado: {formatPrice(estimatedTotal(items))}</strong>
-            {items.length > 0 && !isSubmitting ? <Link className="btn btn-primary" to={`${prefix}/pedido/resumo`}>Revisar pedido</Link> :
-              <Button disabled>Revisar pedido</Button>}
+            {items.length > 0 && !isSubmitting ? <Link className="btn btn-primary" to={`${prefix}/pedido/resumo`}>{reviewLabel}</Link> :
+              <Button disabled>{reviewLabel}</Button>}
           </div>
         </>
       )}

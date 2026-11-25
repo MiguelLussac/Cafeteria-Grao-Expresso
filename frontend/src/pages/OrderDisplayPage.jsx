@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Check, Clock, Coffee, ShoppingBag } from 'lucide-react'
+import { Check, Clock, Coffee, ShoppingBag, Smartphone } from 'lucide-react'
 import { Alert, Button, Loading } from '../components/ui'
 import { listDisplayOrders, subscribeOrderEvents } from '../services/api'
 import { createSerialRunner } from '../utils/kitchen'
@@ -28,7 +28,16 @@ function orderNumber(id) {
 function OrderNumbers({ orders }) {
   return (
     <ul className="display-numbers">
-      {orders.map(({ id }) => <li key={id}>{orderNumber(id)}</li>)}
+      {orders.map(({ id, channel }) => (
+        <li key={id}>
+          {orderNumber(id)}
+          {channel === 'site' && (
+            <span className="display-channel" title="Pedido feito pelo site">
+              <Smartphone aria-hidden="true" /><span className="visually-hidden">pedido feito pelo site</span>
+            </span>
+          )}
+        </li>
+      ))}
     </ul>
   )
 }
@@ -128,6 +137,9 @@ export default function OrderDisplayPage() {
       <footer className="display-footer">
         <ShoppingBag aria-hidden="true" />
         Retire no balcão informando o número do seu pedido
+        <span className="display-footer-legend">
+          <Smartphone aria-hidden="true" /> pedido feito pelo site
+        </span>
       </footer>
     </div>
   )

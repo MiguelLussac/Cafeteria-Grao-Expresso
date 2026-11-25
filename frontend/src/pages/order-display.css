@@ -143,6 +143,26 @@
   text-align: center;
 }
 .display-footer svg { flex-shrink: 0; width: 1.15em; height: 1.15em; }
+.display-footer-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: .3em;
+  margin-left: 1.2em;
+  font-size: .75em;
+  font-weight: 500;
+  opacity: .85;
+}
+
+/* Marca dos pedidos feitos pelo site, ao lado do número */
+.display-numbers li { position: relative; }
+.display-channel {
+  position: absolute;
+  top: .35em;
+  right: .4em;
+  display: inline-flex;
+  color: var(--color-muted);
+}
+.display-channel svg { width: .3em; height: .3em; min-width: 18px; min-height: 18px; }
 
 @media (max-width: 640px) {
   .display-header { flex-wrap: wrap; }

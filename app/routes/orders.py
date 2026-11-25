@@ -4,7 +4,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import selectinload
 
 from app.extensions import db
-from app.models.order import Order, OrderItem, OrderStatus
+from app.models.order import Order, OrderChannel, OrderItem, OrderStatus
 from app.models.payment import Payment, PaymentStatus
 from app.models.product import Product
 from app.services.sse_service import sse_broker
@@ -52,6 +52,10 @@ def create_order():
     notes, err = _texto_opcional(data, "notes", "")
     if err:
         return _erro(err)
+    # Canal de origem: o site e o totem se identificam; sem o campo, o pedido é do balcão.
+    channel = data.get("channel", OrderChannel.BALCAO)
+    if channel not in OrderChannel.ALL:
+        return _erro("O campo 'channel' deve ser 'site', 'totem' ou 'balcao'.")
 
     validated = []
     total = Decimal("0.00")
@@ -82,6 +86,7 @@ def create_order():
             customer_name=customer_name,
             table_number=table_number,
             notes=notes,
+            channel=channel,
             status=OrderStatus.RECEBIDO,
             total_amount=total
         )
@@ -109,6 +114,7 @@ def create_order():
             "customer_name": order.customer_name,
             "table_number": order.table_number,
             "status": order.status,
+            "channel": order.channel,
             "total_amount": float(order.total_amount),
             "items_count": len(order.items)
         }))
@@ -116,9 +122,10 @@ def create_order():
         current_app.logger.warning("Pedido %s foi criado, mas a publicação SSE falhou.", order.id)
 
     current_app.logger.info(
-        "Pedido criado com sucesso. order_id=%s status=%s",
+        "Pedido criado com sucesso. order_id=%s status=%s channel=%s",
         order.id,
         order.status,
+        order.channel,
     )
 
     return jsonify({

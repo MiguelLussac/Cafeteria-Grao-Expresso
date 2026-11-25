@@ -38,10 +38,11 @@ export function OrderProvider({ children }) {
     setSubmit(() => createOrderSubmitter(createOrder))
   }, [isSubmitting])
 
-  async function confirmOrder() {
+  // channel: 'site' (cardápio web, retirada antecipada) ou 'totem'.
+  async function confirmOrder(channel) {
     setIsSubmitting(true)
     try {
-      const order = await submit(items, details)
+      const order = await submit(items, details, channel)
       setCreatedOrder(order)
       return order
     } finally {

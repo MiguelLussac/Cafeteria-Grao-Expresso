@@ -157,3 +157,35 @@ def test_falha_no_sse_nao_derruba_pedido_ja_salvo(client, monkeypatch):
     r = criar(client, items=[{"product_id": 1, "quantity": 1}])
     assert r.status_code == 201
     assert contagem(client) == (1, 1)
+
+
+# ---------- Canal de origem (site, totem ou balcão) ----------
+
+@pytest.mark.parametrize("canal", ["site", "totem", "balcao"])
+def test_canal_informado_e_salvo(client, canal):
+    r = criar(client, items=[{"product_id": 1, "quantity": 1}], channel=canal)
+    assert r.status_code == 201
+    assert r.json["data"]["channel"] == canal
+    with client.app_ref.app_context():
+        assert Order.query.get(r.json["data"]["id"]).channel == canal
+
+
+def test_sem_canal_o_pedido_e_do_balcao(client):
+    r = criar(client, items=[{"product_id": 1, "quantity": 1}])
+    assert r.status_code == 201
+    assert r.json["data"]["channel"] == "balcao"
+
+
+@pytest.mark.parametrize("canal", ["delivery", "", "SITE", 1, None, ["site"]])
+def test_canal_invalido_rejeita_sem_salvar(client, canal):
+    antes = contagem(client)
+    r = criar(client, items=[{"product_id": 1, "quantity": 1}], channel=canal)
+    assert r.status_code == 400
+    assert "channel" in r.json["error"]
+    assert contagem(client) == antes
+
+
+def test_canal_vai_no_evento_da_cozinha(client):
+    criar(client, items=[{"product_id": 1, "quantity": 1}], channel="site")
+    evento, dados = sse_broker.events[-1]
+    assert evento == "new_order" and dados["channel"] == "site"

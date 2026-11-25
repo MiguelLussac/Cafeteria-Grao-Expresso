@@ -18,15 +18,29 @@ class OrderStatus:
         CANCELADO: set(),
     }
 
+class OrderChannel:
+    """Por onde o pedido entrou no sistema."""
+    SITE = "site"      # cardápio web: pedido antecipado para retirada no balcão
+    TOTEM = "totem"    # autoatendimento na loja
+    BALCAO = "balcao"  # registrado pela equipe no balcão
+
+    ALL = [SITE, TOTEM, BALCAO]
+
+
 class Order(db.Model):
     """Modelo de pedido da cafeteria."""
     __tablename__ = "orders"
+    __table_args__ = (
+        db.CheckConstraint("channel IS NULL OR channel IN ('site', 'totem', 'balcao')", name="ck_orders_channel"),
+    )
 
     id = db.Column(db.Integer, primary_key=True)
     customer_name = db.Column(db.String(120), nullable=True)
     table_number = db.Column(db.String(50), nullable=True)
     notes = db.Column(db.Text, nullable=True)
     status = db.Column(db.String(30), default=OrderStatus.RECEBIDO, nullable=False, index=True)
+    # Pedidos anteriores a este campo ficam com NULL: não há como saber o canal deles.
+    channel = db.Column(db.String(10), default=OrderChannel.BALCAO, nullable=True)
     total_amount = db.Column(db.Numeric(10, 2), default=0.00, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
@@ -41,6 +55,7 @@ class Order(db.Model):
             "table_number": self.table_number,
             "notes": self.notes,
             "status": self.status,
+            "channel": self.channel,
             "total_amount": float(self.total_amount),
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
