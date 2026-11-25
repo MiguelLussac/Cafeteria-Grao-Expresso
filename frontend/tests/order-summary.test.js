@@ -43,9 +43,26 @@ test('resumo calcula unidades e total estimado de um ou vários produtos', () =>
 
 test('confirmação envia somente identificação, observações, IDs e quantidades', () => {
   assert.deepEqual(orderPayload(items, details), {
-    customer_name: 'Miguel', table_number: 'Mesa', notes: 'Sem açúcar',
+    customer_name: 'Miguel', table_number: 'Mesa', notes: 'Sem açúcar', channel: 'totem',
     items: [{ product_id: 1, quantity: 2 }, { product_id: 2, quantity: 3 }],
   })
+})
+
+test('pedido do site é sempre para retirada, mesmo sem escolher Mesa ou Retirada', () => {
+  for (const table_number of ['', 'Mesa', undefined]) {
+    const payload = orderPayload(items, { ...details, table_number }, 'site')
+    assert.equal(payload.table_number, 'Retirada')
+    assert.equal(payload.channel, 'site')
+  }
+})
+
+test('canal desconhecido não chama a API', () => {
+  let calls = 0
+  const submit = createOrderSubmitter(() => { calls++ })
+  for (const channel of ['delivery', '', 'SITE']) {
+    assert.throws(() => submit(items, details, channel), /Canal do pedido inválido/)
+  }
+  assert.equal(calls, 0)
 })
 
 test('Mesa ou Retirada é obrigatório e aceita somente uma opção válida', () => {

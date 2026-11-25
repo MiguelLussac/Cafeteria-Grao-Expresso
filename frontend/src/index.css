@@ -1760,6 +1760,14 @@ textarea {
   font-weight: 700;
 }
 
+.ticket-flag-site {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--color-info-bg);
+  color: var(--color-info-text);
+}
+
 .ticket-flag-late {
   background: var(--color-error-bg);
   color: var(--color-error-text);
@@ -2102,6 +2110,31 @@ textarea {
 
 .menu-header-note { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .menu-sort { display: flex; align-items: center; gap: 10px; font-weight: 600; }
+
+/* Pedido antecipado pelo site: retirada no balcão */
+.pickup-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 8px 14px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-alt);
+  color: var(--color-primary);
+  font-weight: 600;
+}
+.pickup-info {
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface-alt);
+  color: var(--color-primary);
+}
+.pickup-info svg { flex-shrink: 0; margin-top: 2px; }
+.pickup-info p { margin: 0; color: var(--color-text); font-size: .95rem; }
+.pickup-info strong { display: block; color: var(--color-primary); }
 .menu-sort .select { min-width: 190px; }
 
 /* ---------- Checkout: revisão e pagamento ---------- */

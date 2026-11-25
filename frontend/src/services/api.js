@@ -166,7 +166,7 @@ export async function deleteProduct(id) {
 
 // ---------- Pedidos e pagamento simulado ----------
 
-// order: { items: [{ product_id, quantity }], customer_name?, table_number?, notes? }
+// order: { items: [{ product_id, quantity }], customer_name?, table_number?, notes?, channel? }
 export async function createOrder(order) {
   const res = await request('/orders', { method: 'POST', body: order })
   return res.data

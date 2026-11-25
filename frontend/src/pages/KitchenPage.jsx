@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ChefHat, Clock, RefreshCw } from 'lucide-react'
+import { ChefHat, Clock, RefreshCw, Smartphone } from 'lucide-react'
 import useKitchenQueue from '../hooks/useKitchenQueue'
 import { Alert, Button, EmptyState, Loading } from '../components/ui'
 import { formatTime } from '../utils/format'
@@ -46,8 +46,13 @@ function OrderTicket({ order, oldest, now, updating, onAction }) {
         </span>
       </header>
 
-      {(oldest || late) && (
+      {(oldest || late || order.channel === 'site') && (
         <div className="ticket-flags">
+          {order.channel === 'site' && (
+            <span className="ticket-flag ticket-flag-site" title="Pedido feito pelo site: o cliente ainda vai chegar para retirar">
+              <Smartphone size={14} aria-hidden="true" /> Retirada antecipada
+            </span>
+          )}
           {oldest && <span className="ticket-flag">Mais antigo</span>}
           {late && <span className="ticket-flag ticket-flag-late">Atrasado</span>}
         </div>

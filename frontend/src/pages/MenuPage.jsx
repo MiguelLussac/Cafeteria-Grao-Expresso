@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { ShoppingBag } from 'lucide-react'
 import { listProducts } from '../services/api'
 import { CATEGORIES } from '../utils/format'
 import { nutritionState } from '../utils/nutrition'
@@ -86,6 +87,12 @@ export default function MenuPage({ totem = false }) {
             Cafés, doces e salgados preparados todos os dias.
             <AiBadge label="Calorias estimadas por IA" withInfo />
           </p>
+          {!totem && (
+            <p className="pickup-note">
+              <ShoppingBag size={18} aria-hidden="true" />
+              Peça antes e retire no balcão, sem fila.
+            </p>
+          )}
         </div>
         {status === 'ready' && products.length > 0 && (
           <label className="menu-sort">

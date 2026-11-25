@@ -20,11 +20,17 @@ def criar_pedido(status=OrderStatus.RECEBIDO, pagamento=PaymentStatus.PAGO, minu
         total_amount=extra.get("total", 42.90),
         created_at=BASE + timedelta(minutes=minutos),
     )
+    if "channel" in extra:
+        order.channel = extra["channel"]
     db.session.add(order)
     db.session.flush()
     if pagamento is not None:
         db.session.add(Payment(order_id=order.id, method="pix", amount=order.total_amount, status=pagamento))
     db.session.commit()
+    if "channel" in extra and extra["channel"] is None:
+        # Pedido anterior ao campo: o valor padrão do model não pode ser aplicado.
+        Order.query.filter_by(id=order.id).update({"channel": None})
+        db.session.commit()
     return order.id
 
 
@@ -41,7 +47,7 @@ def test_lista_vazia(client):
 @pytest.mark.parametrize("status", OrderStatus.KITCHEN)
 def test_pedidos_pagos_nos_tres_status_aparecem(client, status):
     pid = criar_pedido(status=status)
-    assert client.get(URL).json["data"] == [{"id": pid, "status": status}]
+    assert client.get(URL).json["data"] == [{"id": pid, "status": status, "channel": "balcao"}]
 
 
 @pytest.mark.parametrize("status", [OrderStatus.ENTREGUE, OrderStatus.CANCELADO])
@@ -86,11 +92,11 @@ def test_empate_de_horario_desempata_pelo_id(client):
     assert ids(client) == [a, b]
 
 
-def test_privacidade_somente_id_e_status(client):
+def test_privacidade_somente_id_status_e_canal(client):
     criar_pedido(customer_name="Maria Segredo", table_number="Mesa 9", notes="alergia a amendoim", total=42.90)
     r = client.get(URL)
     assert set(r.json.keys()) == {"success", "count", "data"}
-    assert all(set(item.keys()) == {"id", "status"} for item in r.json["data"])
+    assert all(set(item.keys()) == {"id", "status", "channel"} for item in r.json["data"])
     corpo = r.get_data(as_text=True).lower()
     for proibido in ["maria", "segredo", "mesa", "amendoim", "42.9", "pix", "amount", "total",
                      "customer", "notes", "payment", "created_at"]:
@@ -110,3 +116,9 @@ def test_nao_quebra_a_consulta_de_pedido_por_id(client):
     pid = criar_pedido()
     assert client.get(f"/api/v1/orders/{pid}").status_code == 200
     assert client.get("/api/v1/orders/9999").status_code == 404
+
+def test_monitor_informa_o_canal(client):
+    site = criar_pedido(channel="site")
+    legado = criar_pedido(channel=None)
+    canais = {item["id"]: item["channel"] for item in client.get(URL).json["data"]}
+    assert canais == {site: "site", legado: None}

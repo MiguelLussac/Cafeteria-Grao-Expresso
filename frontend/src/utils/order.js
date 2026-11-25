@@ -26,20 +26,27 @@ export function estimatedTotal(items) {
   return items.reduce((total, item) => total + Math.round(item.price * 100) * item.quantity, 0) / 100
 }
 
-export function orderPayload(items, details) {
+// Canais de origem aceitos pela API. O site só faz pedidos para retirada no balcão;
+// no totem o cliente escolhe entre Mesa e Retirada.
+export const CHANNELS = ['site', 'totem', 'balcao']
+
+export function orderPayload(items, details, channel = 'totem') {
+  if (!CHANNELS.includes(channel)) throw new Error('Canal do pedido inválido.')
   if (!items.length) throw new Error('Selecione ao menos um produto para confirmar o pedido.')
   if (items.some((item) => !Number.isInteger(item.id) || item.id <= 0 ||
     !Number.isInteger(item.quantity) || item.quantity <= 0)) {
     throw new Error('Revise os produtos e as quantidades antes de confirmar.')
   }
-  if (!['Mesa', 'Retirada'].includes(details.table_number)) {
+  const tableNumber = channel === 'site' ? 'Retirada' : details.table_number
+  if (!['Mesa', 'Retirada'].includes(tableNumber)) {
     throw new Error('Escolha Mesa ou Retirada antes de confirmar o pedido.')
   }
   return {
     items: items.map(({ id, quantity }) => ({ product_id: id, quantity })),
     customer_name: details.customer_name.trim(),
-    table_number: details.table_number,
+    table_number: tableNumber,
     notes: details.notes.trim(),
+    channel,
   }
 }
 
@@ -48,10 +55,10 @@ export function orderPayload(items, details) {
 export function createOrderSubmitter(createOrder) {
   let pending = null
   let created = null
-  return function submit(items, details) {
+  return function submit(items, details, channel) {
     if (created) return Promise.resolve(created)
     if (pending) return pending
-    const payload = orderPayload(items, details)
+    const payload = orderPayload(items, details, channel)
     pending = Promise.resolve().then(() => createOrder(payload)).then((order) => {
       created = order
       return order

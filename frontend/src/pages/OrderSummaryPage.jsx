@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, Minus, Plus, Sparkles, Trash2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Minus, Plus, ShoppingBag, Sparkles, Trash2 } from 'lucide-react'
 import { Alert, Button, EmptyState, Field, ItemThumb } from '../components/ui'
 import { KcalPill } from '../components/Nutrition'
 import { useOrder } from '../context/OrderContext'
@@ -29,7 +29,7 @@ export default function OrderSummaryPage({ totem = false }) {
     event.preventDefault()
     setError('')
     try {
-      const order = await confirmOrder()
+      const order = await confirmOrder(totem ? 'totem' : 'site')
       navigate(`${prefix}/pedido/${order.id}/pagamento`, { replace: true })
     } catch (err) {
       setError(err.message || 'Não foi possível registrar o pedido. Tente novamente.')
@@ -46,7 +46,7 @@ export default function OrderSummaryPage({ totem = false }) {
     <div className="container page">
       <Link to={menuPath} className="link-back"><ArrowLeft size={16} aria-hidden="true" /> Continuar escolhendo</Link>
       <header className="page-header">
-        <h1>Revise seu pedido</h1>
+        <h1>{totem ? 'Revise seu pedido' : 'Revise seu pedido para retirada'}</h1>
       </header>
       {!items.length ? (
         <EmptyState title="Seu pedido está vazio." action={<Link className="btn btn-primary" to={menuPath}>Escolher produtos</Link>}>
@@ -92,8 +92,10 @@ export default function OrderSummaryPage({ totem = false }) {
             <fieldset className="card order-details" disabled={isSubmitting}>
               <legend>Dados do pedido</legend>
               <Field label="Seu nome" id="customer_name" optional>
-                <input id="customer_name" name="customer_name" maxLength={120} value={details.customer_name} onChange={change} placeholder="Balcão" />
+                <input id="customer_name" name="customer_name" maxLength={120} value={details.customer_name} onChange={change}
+                  placeholder={totem ? 'Balcão' : 'Como chamamos você na retirada?'} />
               </Field>
+              {totem ? (
               <fieldset className="order-service-mode">
                 <legend>Onde vai consumir? <span className="required">*</span></legend>
                 <div className="order-service-options">
@@ -106,6 +108,15 @@ export default function OrderSummaryPage({ totem = false }) {
                   ))}
                 </div>
               </fieldset>
+              ) : (
+                <div className="pickup-info" role="note">
+                  <ShoppingBag size={20} aria-hidden="true" />
+                  <p>
+                    <strong>Retirada no balcão</strong>
+                    Você retira no balcão quando o pedido ficar pronto. O número dele aparece no monitor da loja.
+                  </p>
+                </div>
+              )}
               <Field label="Observações" id="notes" optional>
                 <textarea id="notes" name="notes" rows={2} value={details.notes} onChange={change} placeholder="Ex.: café sem açúcar" />
               </Field>

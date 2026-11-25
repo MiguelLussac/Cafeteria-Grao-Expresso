@@ -248,11 +248,11 @@ def test_stream_disconnect_reconnect_and_api_recovery(client, headers):
     assert [row['id'] for row in recovered] == [order_id]
     assert recovered[0]['status'] == 'em_preparo'
     display_url = '/api/v1/orders/display'
-    assert client.get(display_url).get_json()['data'] == [{'id': order_id, 'status': 'em_preparo'}]
+    assert client.get(display_url).get_json()['data'] == [{'id': order_id, 'status': 'em_preparo', 'channel': 'balcao'}]
     assert advance(client, headers, order_id, 'pronto').status_code == 200
     assert 'event: order_status_updated' in next(stream.response).decode()
     assert 'event: order_ready' in next(stream.response).decode()
-    assert client.get(display_url).get_json()['data'] == [{'id': order_id, 'status': 'pronto'}]
+    assert client.get(display_url).get_json()['data'] == [{'id': order_id, 'status': 'pronto', 'channel': 'balcao'}]
     assert advance(client, headers, order_id, 'entregue').status_code == 200
     assert 'event: order_status_updated' in next(stream.response).decode()
     assert client.get(display_url).get_json()['data'] == []
