@@ -301,7 +301,7 @@ def get_product(product_id):
 @products_bp.route("/products", methods=["POST"])
 @products_bp.route("/cadastrar-produto", methods=["POST"])
 @products_bp.route("/cadastrar-produto/", methods=["POST"])
-@_require_product_role("admin", "atendente")
+@_require_product_role("admin")
 def create_product():
     """Cadastrar novo produto no cardápio."""
     product_data, error = _validate_product_data(request.get_json(silent=True))
@@ -328,7 +328,7 @@ def create_product():
 @products_bp.route("/products/<int:product_id>", methods=["PUT"])
 @products_bp.route("/alterar-produto/<int:product_id>", methods=["PUT"])
 @products_bp.route("/alterar-produto/<int:product_id>/", methods=["PUT"])
-@_require_product_role("admin", "atendente")
+@_require_product_role("admin")
 def update_product(product_id):
     """Atualizar dados de um produto existente."""
     product = Product.query.get(product_id)
@@ -376,7 +376,7 @@ def update_product(product_id):
 
 
 @products_bp.route("/products/<int:product_id>/image", methods=["POST"])
-@_require_product_role("admin", "atendente")
+@_require_product_role("admin")
 def upload_product_image(product_id):
     """Envia a foto do produto para o Supabase Storage (campo multipart "image")."""
     product = db.session.get(Product, product_id)
@@ -422,7 +422,7 @@ def upload_product_image(product_id):
 
 
 @products_bp.route("/products/<int:product_id>/image", methods=["DELETE"])
-@_require_product_role("admin", "atendente")
+@_require_product_role("admin")
 def delete_product_image(product_id):
     """Remove a foto do produto (e o arquivo do Storage, se estiver no bucket)."""
     product = db.session.get(Product, product_id)
@@ -445,7 +445,7 @@ def delete_product_image(product_id):
 
 
 @products_bp.route("/products/<int:product_id>/nutrition/retry", methods=["POST"])
-@_require_product_role("admin", "atendente")
+@_require_product_role("admin")
 def retry_product_nutrition(product_id):
     """Pede uma nova estimativa à IA para um produto cuja tabela falhou."""
     product = db.session.get(Product, product_id)

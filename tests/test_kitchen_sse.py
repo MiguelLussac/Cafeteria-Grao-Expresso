@@ -121,6 +121,13 @@ def test_employee_roles_allowed(client, role):
     assert client.get('/api/v1/orders/kitchen', headers=headers).status_code == 200
 
 
+def test_atendente_can_view_but_not_change_kitchen(client):
+    login = client.post('/api/v1/auth/login', json={'username': 'atendente', 'password': 'atendente123'})
+    headers = {'Authorization': 'Bearer ' + login.get_json()['data']['token']}
+    assert client.get('/api/v1/orders/kitchen', headers=headers).status_code == 200
+    assert client.patch('/api/v1/orders/1/status', json={'status': 'em_preparo'}, headers=headers).status_code == 403
+
+
 def test_invalid_kitchen_filter(client, headers):
     for status in ['cancelado', 'entregue', 'invalid', '']:
         assert client.get('/api/v1/orders/kitchen?status=' + status,

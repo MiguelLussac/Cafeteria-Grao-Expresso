@@ -4,6 +4,7 @@ import { ArrowLeft, Coffee, LogOut, UserRound } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { checkHealth } from '../services/api'
 import { ROLE_LABELS, initials } from '../utils/format'
+import { canAccess } from '../utils/roles'
 
 function Brand() {
   return (
@@ -54,7 +55,7 @@ function HeaderActions() {
 }
 
 export default function Layout() {
-  const { isAuthenticated } = useAuth()
+  const { user, isAuthenticated } = useAuth()
   const { pathname } = useLocation()
   const [apiOnline, setApiOnline] = useState(null)
 
@@ -76,8 +77,9 @@ export default function Layout() {
           {!isLogin && (
             <nav className="nav" aria-label="Principal">
               <NavLink to="/" end>Cardápio</NavLink>
-              {isAuthenticated && <NavLink to="/cozinha">Cozinha</NavLink>}
-              {isAuthenticated && <NavLink to="/admin">Administração</NavLink>}
+              {isAuthenticated && canAccess(user.role, '/balcao') && <NavLink to="/balcao">Balcão</NavLink>}
+              {isAuthenticated && canAccess(user.role, '/cozinha') && <NavLink to="/cozinha">Cozinha</NavLink>}
+              {isAuthenticated && canAccess(user.role, '/admin') && <NavLink to="/admin">Administração</NavLink>}
             </nav>
           )}
           <div className="header-actions">

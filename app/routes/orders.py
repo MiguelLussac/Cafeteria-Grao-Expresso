@@ -163,7 +163,9 @@ def list_orders():
 @orders_bp.route("/orders/kitchen", methods=["GET"])
 @role_required("barista", "atendente", "admin")
 def kitchen_queue():
-    """Estado completo da fila, inclusive para recuperação após reconexão SSE."""
+    """Estado completo da fila, inclusive para recuperação após reconexão SSE.
+
+    O atendente pode acompanhar a fila, mas só barista e admin alteram status."""
     status_filter = request.args.get("status")
     if status_filter is not None and status_filter not in OrderStatus.KITCHEN:
         return jsonify({"success": False, "error": "Status inválido para a cozinha.",
@@ -201,7 +203,7 @@ def get_order(order_id):
 
 
 @orders_bp.route("/orders/<int:order_id>/status", methods=["PATCH"])
-@role_required("barista", "atendente", "admin")
+@role_required("barista", "admin")
 def update_order_status(order_id):
     """Atualizar o status do pedido (usado pela cozinha/barista)."""
     order = Order.query.get(order_id)
