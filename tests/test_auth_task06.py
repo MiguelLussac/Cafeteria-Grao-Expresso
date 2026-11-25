@@ -119,37 +119,30 @@ def test_expired_jwt_returns_401(client, app):
     assert response.get_json()["error"] == "Token expirado. Faça login novamente."
 
 
-def test_atendente_can_create_and_update_but_cannot_delete(client):
-    token = login_token(client)
-    headers = bearer(token)
+def test_atendente_cannot_create_update_or_delete_products(client):
+    headers = bearer(login_token(client))
+    payload = {"name": "Produto de teste Task 06", "description": "x", "price": 5.50, "category": "bebidas"}
 
-    create_response = client.post(
-        "/api/v1/products",
-        json={
-            "name": "Produto de teste Task 06",
-            "description": "Criado durante o teste de autenticação",
-            "price": 5.50,
-            "category": "bebidas",
-        },
-        headers=headers,
-    )
+    assert client.post("/api/v1/products", json=payload, headers=headers).status_code == 403
+    assert client.put("/api/v1/products/1", json={"name": "Novo"}, headers=headers).status_code == 403
+    delete_response = client.delete("/api/v1/products/1", headers=headers)
+    assert delete_response.status_code == 403
+    assert delete_response.get_json()["status_code"] == 403
+
+
+def test_admin_can_create_update_and_delete_products(client):
+    headers = bearer(login_token(client, "admin", "admin123"))
+    payload = {"name": "Produto de teste Task 06", "description": "x", "price": 5.50, "category": "bebidas"}
+
+    create_response = client.post("/api/v1/products", json=payload, headers=headers)
     assert create_response.status_code == 201
     product_id = create_response.get_json()["data"]["id"]
 
-    update_response = client.put(
-        f"/api/v1/products/{product_id}",
-        json={"name": "Produto de teste atualizado"},
-        headers=headers,
-    )
+    update_response = client.put(f"/api/v1/products/{product_id}", json={"name": "Atualizado"}, headers=headers)
     assert update_response.status_code == 200
-    assert update_response.get_json()["data"]["name"] == "Produto de teste atualizado"
+    assert update_response.get_json()["data"]["name"] == "Atualizado"
 
-    delete_response = client.delete(
-        f"/api/v1/products/{product_id}",
-        headers=headers,
-    )
-    assert delete_response.status_code == 403
-    assert delete_response.get_json()["status_code"] == 403
+    assert client.delete(f"/api/v1/products/{product_id}", headers=headers).status_code == 200
 
 
 def test_barista_cannot_create_update_or_delete_products(client):

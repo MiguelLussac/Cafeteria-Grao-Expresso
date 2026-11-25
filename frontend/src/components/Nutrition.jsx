@@ -53,6 +53,11 @@ export function KcalChip({ product, short = false }) {
   return <KcalPill kcal={product.nutrition.calories_kcal} detail={formatServing(product.nutrition)} />
 }
 
+// Só a porção ("240 ml", "120 g"), sem calorias: as kcal ficam dentro da tabela nutricional.
+export function ServingChip({ nutrition }) {
+  return <span className="kcal-chip">{formatServing(nutrition)}</span>
+}
+
 // Pílula "130 kcal · 240 ml" / "260 kcal 2 × 130 kcal".
 export function KcalPill({ kcal, detail, separator = '·' }) {
   return (

@@ -9,6 +9,16 @@ from app.models.product import Product
 def product_headers(client):
     response = client.post(
         "/api/v1/auth/login",
+        json={"username": "admin", "password": "admin123"},
+    )
+    token = response.get_json()["data"]["token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+def atendente_headers(client):
+    response = client.post(
+        "/api/v1/auth/login",
         json={"username": "atendente", "password": "atendente123"},
     )
     token = response.get_json()["data"]["token"]
@@ -217,10 +227,10 @@ def test_delete_product_returns_not_found(client, admin_headers, path):
     assert response.get_json()["error"] == "Produto não encontrado."
 
 
-def test_delete_product_rejects_attendant(client, product_headers):
+def test_delete_product_rejects_attendant(client, atendente_headers):
     response = client.delete(
         "/api/v1/remover-produto/1",
-        headers=product_headers,
+        headers=atendente_headers,
     )
 
     assert response.status_code == 403
