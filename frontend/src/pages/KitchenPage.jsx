@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { ChefHat, Clock, RefreshCw, Smartphone } from 'lucide-react'
 import useKitchenQueue from '../hooks/useKitchenQueue'
+import { useAuth } from '../context/AuthContext'
+import { canChangeKitchen } from '../utils/roles'
 import { Alert, Button, EmptyState, Loading } from '../components/ui'
 import { formatTime } from '../utils/format'
 import {
@@ -27,8 +29,8 @@ function waitingLabel(minutes) {
   return minutes < 1 ? 'agora' : `há ${minutes} min`
 }
 
-function OrderTicket({ order, oldest, now, updating, onAction }) {
-  const action = KITCHEN_ACTIONS[order.status]
+function OrderTicket({ order, oldest, now, updating, onAction, readOnly = false }) {
+  const action = readOnly ? null : KITCHEN_ACTIONS[order.status]
   const minutes = minutesWaiting(order, now)
   const late = order.status !== 'pronto' && minutes >= LATE_AFTER_MINUTES
   const paidAt = order.payment?.paid_at ?? order.created_at
@@ -89,6 +91,8 @@ function OrderTicket({ order, oldest, now, updating, onAction }) {
 
 export default function KitchenPage() {
   const { orders, status, error, connection, updating, changeStatus, refresh } = useKitchenQueue()
+  const { user } = useAuth()
+  const readOnly = !canChangeKitchen(user?.role)
   const [actionError, setActionError] = useState(null)
   const now = useNow()
 
@@ -174,6 +178,7 @@ export default function KitchenPage() {
                       order={order}
                       oldest={index === 0 && column.status !== 'pronto' && list.length > 1}
                       now={now}
+                      readOnly={readOnly}
                       updating={!!updating[order.id]}
                       onAction={handleAction}
                     />

@@ -7,7 +7,7 @@ A implementação segue o contrato já presente em `docs/api_contracts.md`:
 - `POST /api/v1/auth/login`: recebe `username` e `password` em JSON e retorna `data.token`.
 - `GET /api/v1/auth/me`: exige JWT e devolve o funcionário autenticado.
 - `GET /api/v1/products` e `GET /api/v1/products/<id>` continuam públicos.
-- `POST /api/v1/products` e `PUT /api/v1/products/<id>` exigem perfil `admin` ou `atendente`.
+- `POST /api/v1/products` e `PUT /api/v1/products/<id>` exigem perfil `admin`.
 - `DELETE /api/v1/products/<id>` exige perfil `admin`.
 - O JWT é enviado no cabeçalho HTTP `Authorization: Bearer <token>`.
 

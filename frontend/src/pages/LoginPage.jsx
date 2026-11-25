@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Alert, Button, Field } from '../components/ui'
+import { canAccess, homeFor } from '../utils/roles'
 
 function describeError(err) {
   if (err.status === 401) {
@@ -14,10 +15,12 @@ function describeError(err) {
 }
 
 export default function LoginPage() {
-  const { login, isAuthenticated } = useAuth()
+  const { login, isAuthenticated, user } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const redirectTo = location.state?.from || '/admin'
+  // Volta para a tela que o usuário tentou abrir, se o perfil dele puder acessá-la.
+  const from = location.state?.from
+  const destinationFor = (role) => (from && canAccess(role, from) ? from : homeFor(role))
 
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -25,7 +28,7 @@ export default function LoginPage() {
   const [error, setError] = useState(null)
   const [submitting, setSubmitting] = useState(false)
 
-  if (isAuthenticated) return <Navigate to={redirectTo} replace />
+  if (isAuthenticated) return <Navigate to={destinationFor(user.role)} replace />
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -36,8 +39,8 @@ export default function LoginPage() {
     setError(null)
     setSubmitting(true)
     try {
-      await login(username.trim(), password)
-      navigate(redirectTo, { replace: true })
+      const loggedUser = await login(username.trim(), password)
+      navigate(destinationFor(loggedUser.role), { replace: true })
     } catch (err) {
       setError(describeError(err))
     } finally {

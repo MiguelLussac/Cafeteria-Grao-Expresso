@@ -130,7 +130,7 @@ Todas as respostas de erro retornam um JSON padronizado:
 ### 3.3 Criar Novo Produto
 - **Endpoint:** `POST /api/v1/products`
 - **Alias compatível com o quadro da sprint:** `POST /api/v1/cadastrar-produto/`
-- **Acesso:** Requer JWT com role `admin` ou `atendente`
+- **Acesso:** Requer JWT com role `admin`
 - **Campos obrigatórios:** `name` (texto não vazio, até 120 caracteres), `price` (número positivo, até duas casas decimais) e `category` (`bebidas`, `doces`, `salgados` ou `fitness`).
 - **Campo opcional:** `description` (texto).
 - **Request Body:**
@@ -163,7 +163,7 @@ O registro retornado pode ser consultado por `GET /api/v1/products/{id}`.
 
 ### 3.4 Atualizar Produto
 - **Endpoint:** `PUT /api/v1/products/{id}`
-- **Acesso:** Requer JWT com role `admin` ou `atendente`
+- **Acesso:** Requer JWT com role `admin`
 - Os mesmos validadores de nome, preço e categoria do cadastro também são aplicados na edição.
 - **Request Body:**
 ```json
@@ -294,7 +294,7 @@ As datas de pedidos/pagamentos são strings ISO 8601 em UTC **sem sufixo de fuso
 
 ### 4.4 Atualizar Status do Pedido
 - **Endpoint:** `PATCH /api/v1/orders/{id}/status`
-- **Acesso:** Requer JWT com role `barista`, `atendente` ou `admin`
+- **Acesso:** Requer JWT com role `barista` ou `admin`
 - **Request Body:**
 ```json
 {

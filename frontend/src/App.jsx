@@ -14,9 +14,10 @@ import OrderSummaryPage from './pages/OrderSummaryPage'
 import { TotemLayout, TotemHome } from './pages/TotemPage'
 import TotemAssistantPage from './pages/TotemAssistantPage'
 import OrderDisplayPage from './pages/OrderDisplayPage'
+import CounterPage from './pages/CounterPage'
 
-function Protected({ children }) {
-  return <ProtectedRoute>{children}</ProtectedRoute>
+function Protected({ children, roles }) {
+  return <ProtectedRoute roles={roles}>{children}</ProtectedRoute>
 }
 
 export default function App() {
@@ -37,11 +38,12 @@ export default function App() {
               <Route index element={<MenuPage />} />
               <Route path="pedido/resumo" element={<OrderSummaryPage />} />
               <Route path="pedido/:id/pagamento" element={<PaymentPage />} />
-              <Route path="cozinha" element={<Protected><KitchenPage /></Protected>} />
+              <Route path="balcao" element={<Protected roles={['atendente', 'admin']}><CounterPage /></Protected>} />
+              <Route path="cozinha" element={<Protected roles={['barista', 'atendente', 'admin']}><KitchenPage /></Protected>} />
               <Route path="login" element={<LoginPage />} />
-              <Route path="admin" element={<Protected><AdminPage /></Protected>} />
-              <Route path="admin/produtos/novo" element={<Protected><ProductFormPage /></Protected>} />
-              <Route path="admin/produtos/:id/editar" element={<Protected><ProductFormPage /></Protected>} />
+              <Route path="admin" element={<Protected roles={['admin']}><AdminPage /></Protected>} />
+              <Route path="admin/produtos/novo" element={<Protected roles={['admin']}><ProductFormPage /></Protected>} />
+              <Route path="admin/produtos/:id/editar" element={<Protected roles={['admin']}><ProductFormPage /></Protected>} />
               <Route path="*" element={<NotFoundPage />} />
             </Route>
           </Routes>

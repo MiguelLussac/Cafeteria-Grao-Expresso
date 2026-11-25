@@ -99,6 +99,14 @@ function TotemNewOrderButton() {
   )
 }
 
+function CounterNewOrderButton() {
+  const { startNewOrder } = useOrder()
+  const navigate = useNavigate()
+  return (
+    <Button onClick={() => { startNewOrder(); navigate('/balcao') }}>Novo pedido</Button>
+  )
+}
+
 function Confirmation({ order, totem }) {
   const subtitle = [paymentMethodLabel(order.payment.method), formatPrice(order.payment.amount), order.table_number]
     .filter(Boolean).join(' · ')
@@ -119,13 +127,18 @@ function Confirmation({ order, totem }) {
           Acompanhe o número <strong>{String(order.id).padStart(3, '0')}</strong> no monitor da loja
           e retire no balcão quando ele aparecer em “Pronto para retirada”.
         </p>
+      ) : order.channel === 'balcao' ? (
+        <p>
+          Pedido enviado para a cozinha. Chame o cliente quando o número{' '}
+          <strong>{String(order.id).padStart(3, '0')}</strong> aparecer em “Pronto para retirada” no monitor.
+        </p>
       ) : (
         <p>
           Acompanhe na TV do balcão: avisaremos quando estiver pronto
           {order.customer_name ? `, ${order.customer_name}` : ''}.
         </p>
       )}
-      {totem ? <TotemNewOrderButton /> : (
+      {totem ? <TotemNewOrderButton /> : order.channel === 'balcao' ? <CounterNewOrderButton /> : (
         <Link to="/" className="btn btn-outline">Voltar ao cardápio</Link>
       )}
     </div>

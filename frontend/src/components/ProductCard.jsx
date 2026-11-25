@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { ImageIcon, Plus } from 'lucide-react'
 import { Button, CategoryBadge } from './ui'
-import { KcalChip, NutritionDisclosure } from './Nutrition'
+import { KcalChip, NutritionDisclosure, ServingChip } from './Nutrition'
+import { nutritionState } from '../utils/nutrition'
 import { useOrder } from '../context/OrderContext'
 import { formatPrice } from '../utils/format'
 
@@ -20,7 +21,10 @@ export default function ProductCard({ product }) {
       <div className="product-body">
         <h3>{product.name}</h3>
         {product.description && <p className="product-description">{product.description}</p>}
-        <KcalChip product={product} />
+        {/* As calorias só aparecem dentro da tabela nutricional; fora dela ficam a porção e os avisos de cálculo/indisponível. */}
+        {nutritionState(product) === 'ready'
+          ? <ServingChip nutrition={product.nutrition} />
+          : <KcalChip product={product} />}
         {product.nutrition && <NutritionDisclosure nutrition={product.nutrition} />}
         <div className="product-footer">
           <strong className="product-price">{formatPrice(product.price)}</strong>

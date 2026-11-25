@@ -19,7 +19,7 @@ def client():
 
 
 def test_put_valido_persiste_e_aparece_na_consulta(client):
-    r = client.put("/api/v1/products/1", json={"price": 12.5, "name": " Novo nome "}, headers=ATEND)
+    r = client.put("/api/v1/products/1", json={"price": 12.5, "name": " Novo nome "}, headers=ADMIN)
     assert r.status_code == 200
     assert r.json["data"]["price"] == 12.5 and r.json["data"]["name"] == "Novo nome"
     g = client.get("/api/v1/products/1").json["data"]
@@ -58,6 +58,13 @@ def test_put_id_inexistente(client):
 def test_put_permissoes(client):
     assert client.put("/api/v1/products/1", json={"price": 1}).status_code == 401
     assert client.put("/api/v1/products/1", json={"price": 1}, headers=BARISTA).status_code == 403
+
+
+def test_atendente_nao_cria_nem_edita_produto(client):
+    assert client.put("/api/v1/products/1", json={"price": 1}, headers=ATEND).status_code == 403
+    assert client.post("/api/v1/products", json={"name": "X", "price": 1, "category": "bebidas"},
+                       headers=ATEND).status_code == 403
+    assert client.get("/api/v1/products/1").json["data"]["price"] == 10
 
 
 def test_delete_desativa_e_some_da_listagem(client):
