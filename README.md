@@ -184,6 +184,32 @@ frontend/src/
 Copie `frontend/.env.example` para `frontend/.env` e defina `VITE_API_URL` com a URL pública da API (ex.: o Web Service no Render).
 
 ---
+## 🤖 Assistente de pedidos com IA (Gemini)
+
+O totem tem um chat que monta o pedido conversando. A IA usa a API REST do **Google Gemini**; todo o código que fala com o provedor fica em uma única função (`call_gemini`), e as respostas são validadas contra o cardápio do banco antes de entrar no pedido. A documentação completa, com o prompt de sistema e as validações, está em [`docs/ia_assistente_prompts.md`](docs/ia_assistente_prompts.md).
+
+### Variáveis de ambiente da IA
+
+| Variável | Obrigatória | Descrição |
+|---|---|---|
+| `GEMINI_API_KEY` | Sim, para o assistente | Chave da API do Gemini. Crie uma no Google AI Studio (aistudio.google.com) |
+| `GEMINI_MODEL` | Não | Modelo a usar. Padrão: `gemini-3.5-flash-lite` |
+
+- **Local:** adicione as variáveis ao `.env` (copiado de `.env.example`).
+- **Render:** cadastre em **Environment** do serviço `grao-expresso-api`. Nunca coloque a chave no código nem no repositório.
+- **Sem `GEMINI_API_KEY`:** o assistente fica indisponível; o pedido pelos botões do totem e o resto do sistema funcionam normalmente.
+
+### Estimativa nutricional (Edge Function no Supabase)
+
+A tabela nutricional dos produtos é estimada pelo Gemini em uma Edge Function do Supabase (`supabase/functions/macros/`). Essa função **não usa as variáveis do Render**: a chave fica nos **secrets da função no Supabase** (`GEMINI_API_KEY`, e opcionalmente `GEMINI_MODEL`, padrão `gemini-3.5-flash-lite`). Para recriar o ambiente, cadastre os secrets no projeto Supabase. Detalhes em [`docs/edge_function_macros.md`](docs/edge_function_macros.md) e [`docs/ia_assistente_prompts.md`](docs/ia_assistente_prompts.md).
+
+### Testes
+
+Os testes substituem a chamada ao Gemini por uma IA simulada. Não precisam de chave, de rede nem geram custo: `python -m pytest -v`.
+
+### Prompts e rastreabilidade
+
+O prompt de sistema fica versionado no código do assistente (`SYSTEM_PROMPT`). O histórico de mudanças está no Git (`git log -p -- app/services/assistant_service.py`). Exemplos de prompts que falharam e como foram corrigidos: [`docs/prompts_que_falharam.md`](docs/prompts_que_falharam.md).
 
 ## ☁️ Deploy no Render
 
